@@ -5,9 +5,14 @@
   "private": true,
   "scripts": {
     "dev": "bun run --watch src/index.ts",
+    "dev:full": "bun run build:web && bun run --watch src/index.ts",
+    "build": "bun run build:web && bun run build:server",
+    "build:web": "cd web && bun run build",
+    "build:server": "bun build src/index.ts --outdir dist --target bun",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "bun test"
+    "test": "bun test",
+    "test:server": "bun run dev & sleep 3 && echo 'Testing server...' && curl -s http://localhost:3000/health && pkill -f 'bun.*index.ts'"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

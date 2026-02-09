@@ -6,9 +6,12 @@ import {
   PlayerRole,
   PlayerStatus,
   EventType,
+  GameEvent,
 } from '@/types/game';
 import { RoomManager } from './rooms';
 import { logger } from '@/utils/logger';
+import { ActionLogger } from '@/actions/logger';
+import { SSEManager } from '@/sse/manager';
 
 export class GameState {
   phase: GamePhase = GamePhase.LOBBY;
@@ -20,22 +23,14 @@ export class GameState {
 
   private roomManager: RoomManager;
   private gameLoopInterval: Timer | null = null;
-
-  private sseManager = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    broadcast: (event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE Broadcast] ${event}`, JSON.stringify(data));
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    sendTo: (playerId: string, event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE to ${playerId}] ${event}`, JSON.stringify(data));
-    },
-  };
+  private actionLogger: ActionLogger;
+  private sseManager: SSEManager;
 
   constructor() {
     this.roomManager = new RoomManager();
+    this.actionLogger = new ActionLogger();
+    this.sseManager = new SSEManager();
+
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
       this.rooms.set(room.id, room);
@@ -64,6 +59,21 @@ export class GameState {
   }
 
   // Core Methods
+
+  /**
+   * Log and broadcast a game event
+   */
+  private logAndBroadcast(event: GameEvent): void {
+    // Log action with game state
+    this.actionLogger.logAction(event, this);
+
+    // Broadcast via SSE
+    this.sseManager.broadcast(event);
+
+    // Log to console
+    logger.logGameEvent(event.type, event.payload);
+  }
+
   startRound(): void {
     const previousPhase = this.phase;
     this.phase = GamePhase.ROUND;
@@ -80,10 +90,15 @@ export class GameState {
 
     this.spawnPlayersInRandomRooms();
 
-    this.sseManager.broadcast(EventType.ROUND_STARTED, {
-      roundNumber: this.roundNumber,
-      imposterCount: this.getImposterCount(),
-    });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.ROUND_STARTED,
+      payload: {
+        roundNumber: this.roundNumber,
+        imposterCount: this.getImposterCount(),
+      },
+    };
+    this.logAndBroadcast(event);
 
     this.startRoundLoop();
   }
@@ -217,11 +232,16 @@ export class GameState {
         roundTimer: this.roundTimer,
       });
 
-      this.sseManager.broadcast(EventType.ACTION_PROMPT, {
-        phase: this.phase,
-        roundTimer: this.roundTimer,
-        promptType: 'move',
-      });
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.ACTION_PROMPT,
+        payload: {
+          phase: this.phase,
+          roundTimer: this.roundTimer,
+          promptType: 'move',
+        },
+      };
+      this.logAndBroadcast(event);
     } catch (error) {
       logger.error('Error in promptAgents', {
         error: error instanceof Error ? error.message : String(error),
@@ -326,11 +346,16 @@ export class GameState {
         location: body.location.roomId,
       });
 
-      this.sseManager.broadcast(EventType.BODY_FOUND, {
-        reporterId: playerId,
-        deadBodyId: bodyId.toString(),
-        location: body.location,
-      });
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.BODY_FOUND,
+        payload: {
+          reporterId: playerId,
+          deadBodyId: bodyId.toString(),
+          location: body.location,
+        },
+      };
+      this.logAndBroadcast(event);
 
       // Check if council should start
       if (this.shouldStartCouncil()) {
@@ -362,10 +387,15 @@ export class GameState {
         roundTimer: this.roundTimer,
       });
 
-      this.sseManager.broadcast(EventType.COUNCIL_CALLED, {
-        callerId: 'system',
-        reason,
-      });
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.COUNCIL_CALLED,
+        payload: {
+          callerId: 'system',
+          reason,
+        },
+      };
+      this.logAndBroadcast(event);
 
       // In a real implementation, we would delegate to VotingSystem here.
       // But VotingSystem is a separate class/file.
@@ -420,6 +450,20 @@ export class GameState {
       playerName: player.name,
       role: player.role,
     });
+  }
+
+  /**
+   * Get the action logger for querying logged actions
+   */
+  getActionLogger(): ActionLogger {
+    return this.actionLogger;
+  }
+
+  /**
+   * Get the SSE manager for event broadcasting
+   */
+  getSSEManager(): SSEManager {
+    return this.sseManager;
   }
 
   // Reset game state for starting a fresh game
