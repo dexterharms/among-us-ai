@@ -1,2 +1,2 @@
 export * from './types';
-export * from './definitions/skeld-tasks';
+export * from './definitions/map0-tasks';

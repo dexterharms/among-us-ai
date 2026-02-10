@@ -6,13 +6,7 @@ export enum TaskType {
 }
 
 export enum MinigameType {
-  DOWNLOAD = 'download',
-  UPLOAD = 'upload',
-  SWIPE = 'swipe',
-  WIRES = 'wires',
-  SCAN = 'scan',
-  EMPTY = 'empty',
-  FUEL = 'fuel',
+  COUNTER = 'counter',
 }
 
 export const TaskTypeSchema = z.nativeEnum(TaskType);
