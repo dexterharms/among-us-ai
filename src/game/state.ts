@@ -12,6 +12,7 @@ import { RoomManager } from './rooms';
 import { logger } from '@/utils/logger';
 import { ActionLogger } from '@/actions/logger';
 import { SSEManager } from '@/sse/manager';
+import { VotingSystem } from './voting';
 
 export class GameState {
   phase: GamePhase = GamePhase.LOBBY;
@@ -25,11 +26,13 @@ export class GameState {
   private gameLoopInterval: Timer | null = null;
   private actionLogger: ActionLogger;
   private sseManager: SSEManager;
+  private votingSystem: VotingSystem;
 
   constructor() {
     this.roomManager = new RoomManager();
     this.actionLogger = new ActionLogger();
     this.sseManager = new SSEManager();
+    this.votingSystem = new VotingSystem(this, this.sseManager);
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -268,8 +271,14 @@ export class GameState {
    */
   cleanup(): void {
     this.stopGameLoop();
-    // Clear any other references or timers here
-    // Future: add VotingSystem cleanup when integrated
+    this.votingSystem.cleanup();
+  }
+
+  /**
+   * Get the voting system for casting votes
+   */
+  getVotingSystem(): VotingSystem {
+    return this.votingSystem;
   }
 
   shouldStartCouncil(): boolean {
@@ -371,52 +380,11 @@ export class GameState {
   }
 
   startCouncilPhase(): void {
-    try {
-      const previousPhase = this.phase;
-      this.phase = GamePhase.VOTING;
-      this.stopGameLoop();
+    // Stop the game loop during council
+    this.stopGameLoop();
 
-      // Guard against invalid roundTimer when determining reason
-      const reason = (typeof this.roundTimer === 'number' && !isNaN(this.roundTimer) && this.roundTimer <= 0)
-        ? 'Timer Expired'
-        : 'Body Found';
-
-      logger.logStateTransition(previousPhase, GamePhase.VOTING, {
-        reason,
-        roundNumber: this.roundNumber,
-        roundTimer: this.roundTimer,
-      });
-
-      const event: GameEvent = {
-        timestamp: Date.now(),
-        type: EventType.COUNCIL_CALLED,
-        payload: {
-          callerId: 'system',
-          reason,
-        },
-      };
-      this.logAndBroadcast(event);
-
-      // In a real implementation, we would delegate to VotingSystem here.
-      // But VotingSystem is a separate class/file.
-      // The GameState might be used *by* the main Game class which coordinates these.
-      // Or GameState might instantiate VotingSystem?
-      // The prompt separates them into phases/files.
-      // I'll keep the logic contained here for state transitions.
-    } catch (error) {
-      logger.error('Error in startCouncilPhase', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Attempt to set phase even if broadcast fails
-      try {
-        this.phase = GamePhase.VOTING;
-        this.stopGameLoop();
-      } catch (innerError) {
-        logger.error('Critical error setting council phase', {
-          error: innerError instanceof Error ? innerError.message : String(innerError),
-        });
-      }
-    }
+    // Delegate to VotingSystem
+    this.votingSystem.startCouncil(this.deadBodies);
   }
 
   // Helper
@@ -440,6 +408,79 @@ export class GameState {
       });
     }
     return count;
+  }
+
+  /**
+   * Getter for serialization (satisfies GameStateSchema.imposterCount)
+   */
+  get imposterCount(): number {
+    return this.getImposterCount();
+  }
+
+  /**
+   * Move a player to a new room
+   * @param playerId - Player to move
+   * @param targetRoomId - Destination room ID
+   * @returns true if move was successful, false otherwise
+   */
+  movePlayer(playerId: string, targetRoomId: string): boolean {
+    const player = this.players.get(playerId);
+    if (!player) {
+      logger.warn('Cannot move: player not found', { playerId });
+      return false;
+    }
+
+    if (player.status !== PlayerStatus.ALIVE) {
+      logger.warn('Cannot move: player not alive', {
+        playerId,
+        status: player.status,
+      });
+      return false;
+    }
+
+    const currentRoomId = player.location.roomId;
+
+    // Validate the movement (check if rooms are connected)
+    if (!this.roomManager.validateMovement(currentRoomId, targetRoomId)) {
+      logger.warn('Invalid movement: rooms not connected', {
+        playerId,
+        currentRoomId,
+        targetRoomId,
+      });
+      return false;
+    }
+
+    const targetRoom = this.roomManager.getRoom(targetRoomId);
+    if (!targetRoom) {
+      logger.warn('Cannot move: target room not found', { targetRoomId });
+      return false;
+    }
+
+    // Update player location
+    player.location = {
+      roomId: targetRoomId,
+      x: targetRoom.position.x,
+      y: targetRoom.position.y,
+    };
+
+    logger.logGameEvent(EventType.PLAYER_MOVED, {
+      playerId,
+      playerName: player.name,
+      fromRoom: currentRoomId,
+      toRoom: targetRoomId,
+    });
+
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.PLAYER_MOVED,
+      payload: {
+        playerId,
+        newLocation: player.location,
+      },
+    };
+    this.logAndBroadcast(event);
+
+    return true;
   }
 
   // Add player helper for testing/usage

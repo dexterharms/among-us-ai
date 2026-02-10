@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "bun test",
-    "test:server": "bun run dev & sleep 3 && echo 'Testing server...' && curl -s http://localhost:3000/health && pkill -f 'bun.*index.ts'"
+    "test:server": "bun run dev & sleep 3 && echo 'Testing server...' && curl -s http://0.0.0.0:3000/health && pkill -f 'bun.*index.ts'"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

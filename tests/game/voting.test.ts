@@ -19,7 +19,7 @@ describe('VotingSystem', () => {
 
   beforeEach(() => {
     gameState = new GameState();
-    votingSystem = new VotingSystem(gameState);
+    votingSystem = new VotingSystem(gameState, gameState.getSSEManager());
 
     // Create players: 1 imposter, 5 crewmates
     imposter = createMockPlayer({

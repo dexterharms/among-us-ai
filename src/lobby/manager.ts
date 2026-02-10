@@ -1,4 +1,5 @@
-import { Player, PlayerRole } from '@/types/game';
+import { Player, PlayerRole, EventType, GameEvent } from '@/types/game';
+import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
 
 export class LobbyManager {
@@ -6,19 +7,11 @@ export class LobbyManager {
   private readyStatus: Set<string> = new Set();
   private isCountdownActive: boolean = false;
   private readonly MIN_PLAYERS = 3;
+  private sseManager: SSEManager;
 
-  private sseManager = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    broadcast: (event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE Broadcast] ${event}`, data);
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    sendTo: (playerId: string, event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE to ${playerId}] ${event}`, data);
-    },
-  };
+  constructor(sseManager: SSEManager) {
+    this.sseManager = sseManager;
+  }
 
   join(player: Player): void {
     // If player is already in lobby (rejoining), clear their ready status
@@ -36,7 +29,12 @@ export class LobbyManager {
       totalPlayers: this.players.size,
     });
 
-    this.sseManager.broadcast('playerJoined', { player });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.PLAYER_JOINED_LOBBY,
+      payload: { player },
+    };
+    this.sseManager.broadcast(event);
     this.broadcastLobbyState();
   }
 
@@ -53,7 +51,12 @@ export class LobbyManager {
         readyPlayers: this.readyStatus.size,
       });
 
-      this.sseManager.broadcast('playerLeft', { playerId });
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.PLAYER_LEFT_LOBBY,
+        payload: { playerId },
+      };
+      this.sseManager.broadcast(event);
 
       // Cancel countdown only if ready players falls below MIN_PLAYERS
       if (this.isCountdownActive && this.readyStatus.size < this.MIN_PLAYERS) {
@@ -62,7 +65,12 @@ export class LobbyManager {
           readyPlayers: this.readyStatus.size,
           minPlayers: this.MIN_PLAYERS,
         });
-        this.sseManager.broadcast('countdownCancelled', {});
+        const cancelEvent: GameEvent = {
+          timestamp: Date.now(),
+          type: EventType.COUNTDOWN_CANCELLED,
+          payload: {},
+        };
+        this.sseManager.broadcast(cancelEvent);
       }
 
       this.broadcastLobbyState();
@@ -100,7 +108,12 @@ export class LobbyManager {
       });
     }
 
-    this.sseManager.broadcast('playerReady', { playerId, ready });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.PLAYER_READY,
+      payload: { playerId, ready },
+    };
+    this.sseManager.broadcast(event);
 
     if (this.checkStartCondition()) {
       this.startCountdown();
@@ -112,7 +125,12 @@ export class LobbyManager {
           readyPlayers: this.readyStatus.size,
           minPlayers: this.MIN_PLAYERS,
         });
-        this.sseManager.broadcast('countdownCancelled', {});
+        const cancelEvent: GameEvent = {
+          timestamp: Date.now(),
+          type: EventType.COUNTDOWN_CANCELLED,
+          payload: {},
+        };
+        this.sseManager.broadcast(cancelEvent);
       }
     }
 
@@ -135,7 +153,12 @@ export class LobbyManager {
       duration: 5,
     });
 
-    this.sseManager.broadcast('countdownStarted', { duration: 5 });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.COUNTDOWN_STARTED,
+      payload: { duration: 5 },
+    };
+    this.sseManager.broadcast(event);
   }
 
   assignRoles(): { crewmates: string[]; imposters: string[] } {
@@ -173,11 +196,16 @@ export class LobbyManager {
   }
 
   broadcastLobbyState(): void {
-    this.sseManager.broadcast('lobbyState', {
-      players: this.getWaitingPlayers(),
-      readyPlayers: Array.from(this.readyStatus),
-      isCountdownActive: this.isCountdownActive,
-    });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.LOBBY_STATE,
+      payload: {
+        players: this.getWaitingPlayers(),
+        readyPlayers: Array.from(this.readyStatus),
+        isCountdownActive: this.isCountdownActive,
+      },
+    };
+    this.sseManager.broadcast(event);
   }
 
   getWaitingPlayers(): Player[] {
@@ -190,5 +218,9 @@ export class LobbyManager {
 
   getCountdownStatus(): boolean {
     return this.isCountdownActive;
+  }
+
+  getPlayerCount(): number {
+    return this.players.size;
   }
 }

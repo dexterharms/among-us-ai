@@ -28,6 +28,15 @@ export enum GamePhase {
 }
 
 export enum EventType {
+  // Lobby events
+  PLAYER_JOINED_LOBBY = 'PlayerJoinedLobby',
+  PLAYER_LEFT_LOBBY = 'PlayerLeftLobby',
+  PLAYER_READY = 'PlayerReady',
+  COUNTDOWN_STARTED = 'CountdownStarted',
+  COUNTDOWN_CANCELLED = 'CountdownCancelled',
+  LOBBY_STATE = 'LobbyState',
+
+  // Game events
   PLAYER_JOINED = 'PlayerJoined',
   PLAYER_LEFT = 'PlayerLeft',
   PLAYER_MOVED = 'PlayerMoved',
@@ -38,9 +47,13 @@ export enum EventType {
   COUNCIL_CALLED = 'CouncilCalled',
   VOTE_CAST = 'VoteCast',
   PLAYER_EJECTED = 'PlayerEjected',
+  PLAYER_KILLED = 'PlayerKilled', // Broadcast when a player is killed
+  YOU_DIED = 'YouDied', // Private event sent to victim
   ROUND_STARTED = 'RoundStarted',
   ROUND_ENDED = 'RoundEnded',
+  GAME_STARTED = 'GameStarted',
   GAME_ENDED = 'GameEnded',
+  GAME_OVER_SUMMARY = 'GameOverSummary',
   ROLE_REVEALED = 'RoleRevealed',
 }
 
@@ -155,8 +168,8 @@ export const CouncilCalledPayload = z.object({
 });
 export const VoteCastPayload = z.object({ voterId: z.string(), targetId: z.string().nullable() });
 export const PlayerEjectedPayload = z.object({
-  playerId: z.string(),
-  role: PlayerRoleSchema,
+  playerId: z.string().nullable(), // null for no ejection (tie/skip)
+  role: PlayerRoleSchema.nullable().optional(), // optional when no ejection
   tie: z.boolean().optional(),
 });
 export const RoundStartedPayload = z.object({ roundNumber: z.number(), imposterCount: z.number() });
@@ -166,6 +179,36 @@ export const GameEndedPayload = z.object({
   reason: z.string(),
 });
 export const RoleRevealedPayload = z.object({ playerId: z.string(), role: PlayerRoleSchema });
+
+// Lobby Event Payloads
+export const PlayerJoinedLobbyPayload = z.object({ player: PlayerSchema });
+export const PlayerLeftLobbyPayload = z.object({ playerId: z.string() });
+export const PlayerReadyPayload = z.object({ playerId: z.string(), ready: z.boolean() });
+export const CountdownStartedPayload = z.object({ duration: z.number() });
+export const CountdownCancelledPayload = z.object({});
+export const LobbyStatePayload = z.object({
+  players: z.array(PlayerSchema),
+  readyPlayers: z.array(z.string()),
+  isCountdownActive: z.boolean(),
+});
+
+// Game Flow Payloads
+export const GameStartedPayload = z.object({
+  playerCount: z.number(),
+  imposterCount: z.number(),
+});
+export const GameOverSummaryPayload = z.object({
+  phase: z.string(),
+  message: z.string(),
+});
+
+// Kill Event Payloads
+export const PlayerKilledPayload = z.object({
+  killerId: z.string(),
+  victimId: z.string(),
+  location: PlayerLocationSchema,
+});
+export const YouDiedPayload = z.object({ killerId: z.string() });
 
 // Event Schemas
 export const PlayerJoinedEventSchema = BaseEventSchema.extend({
@@ -224,8 +267,58 @@ export const RoleRevealedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.ROLE_REVEALED),
   payload: RoleRevealedPayload,
 });
+export const GameStartedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.GAME_STARTED),
+  payload: GameStartedPayload,
+});
+export const GameOverSummaryEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.GAME_OVER_SUMMARY),
+  payload: GameOverSummaryPayload,
+});
+export const PlayerKilledEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.PLAYER_KILLED),
+  payload: PlayerKilledPayload,
+});
+export const YouDiedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.YOU_DIED),
+  payload: YouDiedPayload,
+});
+
+// Lobby Event Schemas
+export const PlayerJoinedLobbyEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.PLAYER_JOINED_LOBBY),
+  payload: PlayerJoinedLobbyPayload,
+});
+export const PlayerLeftLobbyEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.PLAYER_LEFT_LOBBY),
+  payload: PlayerLeftLobbyPayload,
+});
+export const PlayerReadyEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.PLAYER_READY),
+  payload: PlayerReadyPayload,
+});
+export const CountdownStartedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.COUNTDOWN_STARTED),
+  payload: CountdownStartedPayload,
+});
+export const CountdownCancelledEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.COUNTDOWN_CANCELLED),
+  payload: CountdownCancelledPayload,
+});
+export const LobbyStateEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.LOBBY_STATE),
+  payload: LobbyStatePayload,
+});
 
 export const GameEventSchema = z.discriminatedUnion('type', [
+  // Lobby events
+  PlayerJoinedLobbyEventSchema,
+  PlayerLeftLobbyEventSchema,
+  PlayerReadyEventSchema,
+  CountdownStartedEventSchema,
+  CountdownCancelledEventSchema,
+  LobbyStateEventSchema,
+  // Game events
   PlayerJoinedEventSchema,
   PlayerLeftEventSchema,
   PlayerMovedEventSchema,
@@ -238,7 +331,9 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   PlayerEjectedEventSchema,
   RoundStartedEventSchema,
   RoundEndedEventSchema,
+  GameStartedEventSchema,
   GameEndedEventSchema,
+  GameOverSummaryEventSchema,
   RoleRevealedEventSchema,
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;

@@ -1,5 +1,6 @@
-import { PlayerStatus, PlayerRole, EventType, GamePhase, DeadBody } from '@/types/game';
+import { PlayerStatus, PlayerRole, EventType, GamePhase, DeadBody, GameEvent } from '@/types/game';
 import { GameState } from './state';
+import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
 
 export class VotingSystem {
@@ -8,23 +9,13 @@ export class VotingSystem {
   livingPlayers: string[] = [];
 
   private gameState: GameState;
+  private sseManager: SSEManager;
+  private votingTimeout: Timer | null = null;
+  private readonly VOTING_TIMEOUT_MS = 120000; // 2 minutes
 
-  private sseManager = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    broadcast: (event: string, data: any) => {
-      // Mock implementation
-      // eslint-disable-next-line no-console
-      console.log(`[SSE Broadcast] ${event}`, JSON.stringify(data));
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    sendTo: (playerId: string, event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE to ${playerId}] ${event}`, JSON.stringify(data));
-    },
-  };
-
-  constructor(gameState: GameState) {
+  constructor(gameState: GameState, sseManager: SSEManager) {
     this.gameState = gameState;
+    this.sseManager = sseManager;
   }
 
   startCouncil(deadBodies: DeadBody[]): void {
@@ -36,16 +27,32 @@ export class VotingSystem {
       .filter((p) => p.status === PlayerStatus.ALIVE)
       .map((p) => p.id);
 
+    // Clear any previous timeout
+    if (this.votingTimeout) {
+      clearTimeout(this.votingTimeout);
+    }
+
+    // Start voting timeout
+    this.votingTimeout = setTimeout(() => {
+      logger.warn('Voting timed out, finalizing with current votes');
+      this.finalizeVoting();
+    }, this.VOTING_TIMEOUT_MS);
+
     logger.logStateTransition(previousPhase, GamePhase.VOTING, {
       reason: deadBodies.length > 0 ? 'Dead Body Reported' : 'Emergency Meeting',
       deadBodyCount: deadBodies.length,
       livingPlayerCount: this.livingPlayers.length,
     });
 
-    this.sseManager.broadcast(EventType.COUNCIL_CALLED, {
-      callerId: 'system',
-      reason: deadBodies.length > 0 ? 'Dead Body Reported' : 'Emergency Meeting',
-    });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.COUNCIL_CALLED,
+      payload: {
+        callerId: 'system',
+        reason: deadBodies.length > 0 ? 'Dead Body Reported' : 'Emergency Meeting',
+      },
+    };
+    this.sseManager.broadcast(event);
   }
 
   castVote(voterId: string, targetId: string | null): void {
@@ -90,10 +97,12 @@ export class VotingSystem {
       voterRole: voter.role,
     });
 
-    this.sseManager.broadcast(EventType.VOTE_CAST, {
-      voterId,
-      targetId,
-    });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.VOTE_CAST,
+      payload: { voterId, targetId },
+    };
+    this.sseManager.broadcast(event);
 
     // Check for majority or if everyone has voted
     this.checkVotingProgress();
@@ -132,6 +141,12 @@ export class VotingSystem {
   }
 
   finalizeVoting(decisionTargetId: string | null = null): void {
+    // Clear timeout
+    if (this.votingTimeout) {
+      clearTimeout(this.votingTimeout);
+      this.votingTimeout = null;
+    }
+
     // If called without decision (e.g. timeout), calculate result
     if (!decisionTargetId) {
       // Re-calculate tally for timeout case
@@ -154,11 +169,6 @@ export class VotingSystem {
           });
         } else {
           decisionTargetId = top[0];
-          // Must be > 50%? Prompt says "eject if 51% majority".
-          // If timeout and plural vote but not majority, usually strictly majority needed?
-          // "Tie (e.g., 3-3) = NO EJECTION" implies partial logic.
-          // Prompt says "Eject if 51% majority".
-          // So if max votes < 51%, no ejection.
           const majorityThreshold = this.getMajorityThreshold();
           if (top[1] < majorityThreshold) {
             decisionTargetId = 'skip';
@@ -183,19 +193,15 @@ export class VotingSystem {
         livingPlayers: this.livingPlayers.length,
       });
 
-      this.sseManager.broadcast(EventType.PLAYER_EJECTED, {
-        playerId: 'none',
-        role: 'none', // Placeholder, creates type error if strictly typed?
-        // Ejected payload expects role. I'll use a dummy role or handle differently.
-        // Actually, for "Skipped", we might just not send PLAYER_EJECTED or send with null?
-        // EventType.PLAYER_EJECTED expects a player.
-        // I'll emit a "CouncilEnded" or similar if possible.
-        // But prompt says "Tie = NO EJECTION".
-        tie: true,
-      });
-      // Fix: Role is required in payload. I'll pick CREWMATE as dummy or fix type.
-      // Or just not emit PLAYER_EJECTED if no one ejected?
-      // Prompt says "Tie (e.g., 3-3) = NO EJECTION".
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.PLAYER_EJECTED,
+        payload: {
+          playerId: null,
+          tie: true,
+        },
+      };
+      this.sseManager.broadcast(event);
     }
 
     this.checkWinCondition();
@@ -222,11 +228,16 @@ export class VotingSystem {
       votesFor: this.votes.get(playerId) || 'unknown',
     });
 
-    this.sseManager.broadcast(EventType.PLAYER_EJECTED, {
-      playerId,
-      role: player.role,
-      tie: false,
-    });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.PLAYER_EJECTED,
+      payload: {
+        playerId,
+        role: player.role,
+        tie: false,
+      },
+    };
+    this.sseManager.broadcast(event);
   }
 
   checkWinCondition(): void {
@@ -243,20 +254,13 @@ export class VotingSystem {
       totalPlayers: this.gameState.players.size,
     });
 
-    // Crewmates win if 2 imposters ejected (assuming 2 total)
-    // Or check total imposters vs ejected?
-    // "2 imposters ejected" implies 0 remaining if total was 2.
+    // Crewmates win if all imposters ejected
     if (imposters.length === 0) {
       this.endGame('Crewmates', 'All imposters ejected');
       return;
     }
 
-    // All tasks done? (Mock implementation)
-    // this.gameState.players.every(p => p.role === CREWMATE && p.tasksCompleted)
-
-    // Imposters win if only 2 players left (1 imposter, 1 crewmate usually, or 2 vs 2?)
-    // "Imposters win if only 2 players left" -> implies 1 imposter, 1 crewmate.
-    // Standard rule: Imposters >= Crewmates
+    // Imposters win if they outnumber or equal crewmates
     if (imposters.length >= crewmates.length) {
       this.endGame('Imposters', 'Imposters outnumber Crewmates');
     }
@@ -272,10 +276,15 @@ export class VotingSystem {
       totalRounds: this.gameState.getRoundNumber(),
     });
 
-    this.sseManager.broadcast(EventType.GAME_ENDED, {
-      winner,
-      reason,
-    });
+    const event: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.GAME_ENDED,
+      payload: {
+        winner: winner as 'Crewmates' | 'Imposters',
+        reason,
+      },
+    };
+    this.sseManager.broadcast(event);
   }
 
   getLivingPlayerCount(): number {
@@ -287,5 +296,15 @@ export class VotingSystem {
   getMajorityThreshold(): number {
     const livingCount = this.getLivingPlayerCount();
     return Math.floor(livingCount / 2) + 1;
+  }
+
+  /**
+   * Cleanup method to clear any pending timeouts
+   */
+  cleanup(): void {
+    if (this.votingTimeout) {
+      clearTimeout(this.votingTimeout);
+      this.votingTimeout = null;
+    }
   }
 }

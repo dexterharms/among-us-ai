@@ -1,5 +1,7 @@
 import { serve } from 'bun';
 import { GameState } from '@/game/state';
+import { GameCoordinator } from '@/game/coordinator';
+import { LobbyManager } from '@/lobby/manager';
 import { Player, PlayerRole, PlayerStatus } from '@/types/game';
 import { RoomManager } from '@/game/rooms';
 
@@ -10,11 +12,21 @@ import { RoomManager } from '@/game/rooms';
  */
 export class GameServer {
   private gameState: GameState;
+  private lobbyManager: LobbyManager;
+  private gameCoordinator: GameCoordinator;
   private port: number;
+  private hostname: string;
 
-  constructor(port: number = 3000) {
+  constructor(port: number = 3000, hostname: string = '0.0.0.0') {
     this.port = port;
+    this.hostname = hostname;
     this.gameState = new GameState();
+    this.lobbyManager = new LobbyManager(this.gameState.getSSEManager());
+    this.gameCoordinator = new GameCoordinator(
+      this.lobbyManager,
+      this.gameState,
+      this.gameState.getSSEManager(),
+    );
   }
 
   /**
@@ -23,6 +35,7 @@ export class GameServer {
   async start(): Promise<void> {
     const server = serve({
       port: this.port,
+      hostname: this.hostname,
       fetch: async (req) => {
         const url = new URL(req.url);
 
@@ -110,12 +123,223 @@ export class GameServer {
           return Response.json({ status: 'ok', timestamp: Date.now() }, { headers: corsHeaders });
         }
 
+        // ==================== LOBBY API ====================
+
+        // API: Join lobby
+        if (url.pathname === '/api/lobby/join' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { id, name } = body as { id: string; name: string };
+
+            if (!id || !name) {
+              return Response.json(
+                { error: 'Missing required fields: id, name' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const roomManager = new RoomManager();
+            const rooms = roomManager.getRooms();
+            const startRoom = rooms[0];
+
+            const player: Player = {
+              id,
+              name,
+              role: PlayerRole.CREWMATE,
+              status: PlayerStatus.ALIVE,
+              location: {
+                roomId: startRoom?.id || 'cafeteria',
+                x: startRoom?.position.x || 0,
+                y: startRoom?.position.y || 0,
+              },
+            };
+
+            this.lobbyManager.join(player);
+
+            return Response.json({ success: true, player }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error joining lobby:', err);
+            return Response.json(
+              { error: 'Failed to join lobby' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Leave lobby
+        if (url.pathname === '/api/lobby/leave' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId } = body as { playerId: string };
+
+            if (!playerId) {
+              return Response.json(
+                { error: 'Missing required field: playerId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            this.lobbyManager.leave(playerId);
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error leaving lobby:', err);
+            return Response.json(
+              { error: 'Failed to leave lobby' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Set ready status
+        if (url.pathname === '/api/lobby/ready' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, ready } = body as { playerId: string; ready: boolean };
+
+            if (!playerId || typeof ready !== 'boolean') {
+              return Response.json(
+                { error: 'Missing required fields: playerId, ready' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            this.lobbyManager.setReady(playerId, ready);
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error setting ready status:', err);
+            return Response.json(
+              { error: 'Failed to set ready status' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Get lobby state
+        if (url.pathname === '/api/lobby/state' && req.method === 'GET') {
+          return Response.json(
+            {
+              players: this.lobbyManager.getWaitingPlayers(),
+              readyPlayers: Array.from(this.lobbyManager.getReadyPlayers()),
+              playerCount: this.lobbyManager.getPlayerCount(),
+              isCountdownActive: this.lobbyManager.getCountdownStatus(),
+            },
+            { headers: corsHeaders },
+          );
+        }
+
+        // ==================== GAME API ====================
+
+        // API: Start game
+        if (url.pathname === '/api/game/start' && req.method === 'POST') {
+          try {
+            if (!this.lobbyManager.checkStartCondition()) {
+              return Response.json(
+                { error: 'Not enough players or not all players ready' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            this.gameCoordinator.startGame();
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error starting game:', err);
+            return Response.json(
+              { error: 'Failed to start game' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Move player
+        if (url.pathname === '/api/game/move' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, targetRoomId } = body as {
+              playerId: string;
+              targetRoomId: string;
+            };
+
+            if (!playerId || !targetRoomId) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, targetRoomId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const success = this.gameState.movePlayer(playerId, targetRoomId);
+
+            return Response.json({ success }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error moving player:', err);
+            return Response.json(
+              { error: 'Failed to move player' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Cast vote
+        if (url.pathname === '/api/game/vote' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { voterId, targetId } = body as {
+              voterId: string;
+              targetId: string | null;
+            };
+
+            if (!voterId) {
+              return Response.json(
+                { error: 'Missing required field: voterId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            this.gameState.getVotingSystem().castVote(voterId, targetId ?? null);
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error casting vote:', err);
+            return Response.json(
+              { error: 'Failed to cast vote' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Report dead body
+        if (url.pathname === '/api/game/report' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, bodyId } = body as { playerId: string; bodyId: number };
+
+            if (!playerId || bodyId === undefined) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, bodyId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            this.gameState.discoverBody(playerId, bodyId);
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error reporting body:', err);
+            return Response.json(
+              { error: 'Failed to report body' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
         // 404
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       },
     });
 
-    console.log(`🚀 Game server started on http://localhost:${this.port}`);
+    console.log(`🚀 Game server started on http://${this.hostname}:${this.port}`);
   }
 
   /**
@@ -152,6 +376,20 @@ export class GameServer {
    */
   getGameState(): GameState {
     return this.gameState;
+  }
+
+  /**
+   * Get the lobby manager instance
+   */
+  getLobbyManager(): LobbyManager {
+    return this.lobbyManager;
+  }
+
+  /**
+   * Get the game coordinator instance
+   */
+  getGameCoordinator(): GameCoordinator {
+    return this.gameCoordinator;
   }
 
   /**

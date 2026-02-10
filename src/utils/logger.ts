@@ -45,7 +45,6 @@ class Logger {
       case 'INFO':
         return LogLevel.INFO;
       case 'WARN':
-        return LogLevel.WARNING; // TypeScript enum naming inconsistency, handle both
       case 'WARNING':
         return LogLevel.WARN;
       case 'ERROR':

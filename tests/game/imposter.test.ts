@@ -18,7 +18,7 @@ describe('ImposterAbilities', () => {
 
   beforeEach(() => {
     gameState = new GameState();
-    imposterAbilities = new ImposterAbilities(gameState);
+    imposterAbilities = new ImposterAbilities(gameState, gameState.getSSEManager());
 
     // Create players: 2 imposters, 8 crewmates
     // We need enough players so that early kills don't end the game

@@ -1,16 +1,19 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { LobbyManager } from '@/lobby/manager';
+import { SSEManager } from '@/sse/manager';
 import { PlayerRole, type Player } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
 
 describe('LobbyManager', () => {
   let lobbyManager: LobbyManager;
+  let sseManager: SSEManager;
   let player1: Player;
   let player2: Player;
   let player3: Player;
 
   beforeEach(() => {
-    lobbyManager = new LobbyManager();
+    sseManager = new SSEManager();
+    lobbyManager = new LobbyManager(sseManager);
 
     player1 = createMockPlayer({
       id: 'player-1',
@@ -364,7 +367,7 @@ describe('LobbyManager', () => {
 
       // Run multiple times to check randomness
       for (let i = 0; i < 10; i++) {
-        const lobby = new LobbyManager();
+        const lobby = new LobbyManager(new SSEManager());
         lobby.join(player1);
         lobby.join(player2);
         lobby.join(player3);

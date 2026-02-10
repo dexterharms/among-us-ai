@@ -1,5 +1,6 @@
-import { Player, PlayerStatus, PlayerRole, GamePhase, EventType } from '@/types/game';
+import { Player, PlayerStatus, PlayerRole, GamePhase, EventType, GameEvent } from '@/types/game';
 import { GameState } from './state';
+import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
 
 export class ImposterAbilities {
@@ -7,22 +8,11 @@ export class ImposterAbilities {
   private readonly KILL_COOLDOWN = 30000; // 30 seconds in ms
 
   private gameState: GameState;
+  private sseManager: SSEManager;
 
-  private sseManager = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    broadcast: (event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE Broadcast] ${event}`, JSON.stringify(data));
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    sendTo: (playerId: string, event: string, data: any) => {
-      // eslint-disable-next-line no-console
-      console.log(`[SSE to ${playerId}] ${event}`, JSON.stringify(data));
-    },
-  };
-
-  constructor(gameState: GameState) {
+  constructor(gameState: GameState, sseManager: SSEManager) {
     this.gameState = gameState;
+    this.sseManager = sseManager;
   }
 
   attemptKill(imposterId: string, targetId: string): void {
@@ -80,15 +70,13 @@ export class ImposterAbilities {
       roundNumber: this.gameState.getRoundNumber(),
     });
 
-    // Notify (only to imposter usually, or just update state?)
-    // Dead body created, but not necessarily discovered immediately.
-    // Prompt says "deadBodies: Array<{playerId, roomId, discoveredAt}>" in Phase 4,
-    // but here in Phase 7 implementation just says "attemptKill".
-    // I'll assume standard Among Us logic: kill happens, body drops.
-
-    // Broadcast? Usually kill is silent until body found.
-    // But maybe notify the victim?
-    this.sseManager.sendTo(targetId, 'YouDied', { killerId: imposterId }); // Debug event?
+    // Notify the victim
+    const youDiedEvent: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.YOU_DIED,
+      payload: { killerId: imposterId },
+    };
+    this.sseManager.sendTo(targetId, youDiedEvent);
 
     // Check Win Condition immediately
     this.checkWinCondition();
@@ -97,7 +85,7 @@ export class ImposterAbilities {
   canKill(imposter: Player, target: Player): boolean {
     // 1. Role check
     if (imposter.role !== PlayerRole.IMPOSTER) return false;
-    if (target.role === PlayerRole.IMPOSTER) return false; // Can't kill other imposters usually
+    if (target.role === PlayerRole.IMPOSTER) return false; // Can't kill other imposters
 
     // 2. Status check
     if (imposter.status !== PlayerStatus.ALIVE) return false;
@@ -143,13 +131,18 @@ export class ImposterAbilities {
         roundNumber: this.gameState.getRoundNumber(),
       });
 
-      this.sseManager.broadcast(EventType.GAME_ENDED, {
-        winner: 'Imposters',
-        reason: 'Imposters outnumber Crewmates',
-      });
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.GAME_ENDED,
+        payload: {
+          winner: 'Imposters',
+          reason: 'Imposters outnumber Crewmates',
+        },
+      };
+      this.sseManager.broadcast(event);
     }
 
-    // Crewmates win if 0 imposters? (Handled in Voting usually, but if imposter disconnects?)
+    // Crewmates win if 0 imposters
     if (imposters.length === 0) {
       this.gameState.phase = GamePhase.GAME_OVER;
 
@@ -160,10 +153,23 @@ export class ImposterAbilities {
         roundNumber: this.gameState.getRoundNumber(),
       });
 
-      this.sseManager.broadcast(EventType.GAME_ENDED, {
-        winner: 'Crewmates',
-        reason: 'All imposters eliminated',
-      });
+      const event: GameEvent = {
+        timestamp: Date.now(),
+        type: EventType.GAME_ENDED,
+        payload: {
+          winner: 'Crewmates',
+          reason: 'All imposters eliminated',
+        },
+      };
+      this.sseManager.broadcast(event);
     }
+  }
+
+  /**
+   * Get remaining cooldown for an imposter
+   */
+  getCooldownRemaining(imposterId: string): number {
+    const cooldownEnd = this.killCooldowns.get(imposterId) || 0;
+    return Math.max(0, cooldownEnd - Date.now());
   }
 }
