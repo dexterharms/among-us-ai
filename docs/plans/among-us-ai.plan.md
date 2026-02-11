@@ -54,20 +54,111 @@ A text-based multiplayer social deduction game for AI agents (and humans). 4-8 p
 
 ### 3. Round Phase
 
-**Tick System:**
-- Global 5-second tick
-- Each tick sends `ACTION_PROMPT` to all non-waiting players
-- Prompt includes: current phase, round timer, location, room occupants, exits, available actions, flavor text
+#### Tick System
 
-**Player States:**
-- **Idle:** Receives ticks normally
-- **Waiting:** Sent a tick, awaiting response
-- **Reading:** In logs room, receiving chat history instead of normal prompts
+**Global Tick Timer:**
+- Currently 5 seconds between ticks (configurable)
+- Future target: 2 seconds (1 second possible for faster-paced games)
+- Action timeout: 30 seconds (if player doesn't respond, marked as idle again)
 
-**Timeout:**
-- 30 seconds to respond after receiving a tick
-- After timeout, player marked as idle again (no penalty)
-- Next tick will reach them
+**Tick Loop (per tick):**
+1. Send `ACTION_PROMPT` to all non-waiting players
+2. Mark prompted players as "waiting"
+3. Process all queued player actions in order
+4. Broadcast events to all players (SSE)
+
+**Action Queue:**
+- Stored in `GameState.actionQueue`
+- Processed by `GameCoordinator` each tick
+- Actions execute in order they were queued
+- After execution, affected players marked as "idle" (ready for next tick)
+
+#### Player State Machine
+
+```
+Roaming (not interacting, can move)
+    ↓ (receive tick, send action)
+Waiting (awaiting tick processing)
+    ↓ (tick processes action)
+Roaming ←────────────────────────┘
+    ↓ (start task interaction)
+Interacting (in task progress)
+    ↓ (receive task prompt, send action)
+Waiting
+    ↓ (tick processes task action)
+Interacting ←──────────────────┘
+    ↓ (council called)
+Summoned (in council, can't move)
+```
+
+**State Definitions:**
+- **Roaming:** Player can move to connected rooms or start task interactions
+- **Interacting:** Player is actively working on a task (receives task-specific prompts)
+- **Waiting:** Player has sent an action, waiting for tick to process it
+- **Summoned:** Player is in council phase (cannot move, can only vote/discuss)
+
+**Tick Content:**
+- Roaming players: Room description, occupants, exits, interactables, available actions, flavor text
+- Interacting players: Task prompt, room/occupants (for sabotage awareness), available task commands
+- Summoned players: Council context, voting status, discussion options
+
+**Timeout Handling:**
+- 30 seconds after receiving a tick, if no action submitted → player marked as "idle"
+- Next tick reaches them normally (no penalty for missing a tick)
+- Prevents stalled players from blocking game flow
+
+#### Action Payload Formats
+
+**Movement:**
+```typescript
+POST /api/game/move
+{
+  direction: "north" | "south" | "east" | "west"  // Exit direction
+}
+```
+
+**Task Interactions:**
+```typescript
+POST /api/game/task
+{
+  action: "start" | "submit" | "quit",
+  taskId: string,
+  payload?: any  // Task-specific data (guess, sequence, etc.)
+}
+```
+
+**Kill (Imposter Only):**
+```typescript
+POST /api/game/kill
+{
+  targetPlayerId: string
+}
+```
+
+**Vent (Imposter Only):**
+```typescript
+POST /api/game/vent
+{
+  targetRoomId: string  // Destination room
+}
+```
+
+**Sabotage (Imposter Only):**
+```typescript
+POST /api/game/sabotage
+{
+  type: "lights" | "doors" | "self-destruct",
+  target?: string  // Room-specific for doors
+}
+```
+
+**Vote (Council Only):**
+```typescript
+POST /api/game/vote
+{
+  targetPlayerId: string | null  // null = skip vote
+}
+```
 
 **Room Visibility:**
 Players see:
@@ -134,6 +225,20 @@ When a player enters/leaves a room:
 - Task progress is NOT announced (no "Player A completed task" logs)
 - Imposters cannot complete tasks (but can pretend — see Fake Tasks)
 
+**Task Interaction Flow:**
+1. Player (roaming) sends `POST /api/game/task { action: "start", taskId: "..." }`
+2. Action queued → Tick processes → Player state: "roaming" → "interacting"
+3. Next tick: Task prompt + room/occupants (for sabotage awareness) + command options
+4. Player sends task action (e.g., guess a number) → queued → tick processes
+5. Task updates, sends new prompt OR completion confirmation
+6. Player sends `{ action: "quit" }` to abandon task (resets progress for some tasks)
+7. On completion: Player state returns to "roaming"
+
+**Sabotage During Tasks:**
+- Crewmates on tasks are forced to quit
+- Next tick includes sabotage flavor text and exit reminders
+- Some tasks reset progress on quit (hold button), others don't (sequence repetition)
+
 **Ghost Tasks:**
 - Dead players (ghosts) MUST continue completing tasks
 - Ghosts cannot interact in council (no voting, no discussion)
@@ -149,6 +254,185 @@ When a player enters/leaves a room:
 **Task Win Condition:**
 - When all LIVING crewmates complete all their tasks, crewmates win
 - Dead crewmates' tasks do NOT count (only living)
+
+---
+
+## Task Definitions
+
+All tasks are designed for the tick/ping system — each action requires one tick to process.
+
+### 1. Sequence Repetition
+**Type:** Memory
+**Description:**
+- Player is shown a sequence of 5-10 items (numbers, colors, or words)
+- Must submit the sequence one item at a time in correct order
+- On error: "Incorrect. Here's the correct sequence: X X X X X. Try again from the beginning."
+
+**API:**
+```typescript
+POST /api/game/task { action: "submit", taskId: "sequence-repetition", value: string }
+```
+
+**Variants:** Numbers (0-9), Colors (red/blue/green/yellow), Words (random words)
+
+---
+
+### 2. Word-Based Math Puzzle
+**Type:** Logic
+**Description:**
+- Math problem with random values/objects/situations swapped (prevents memorization)
+- Easy/medium/hard tiers, randomly assigned
+- On error: problem is restated (keeps player engaged, not just guessing)
+
+**API:**
+```typescript
+POST /api/game/task { action: "submit", taskId: "word-math", answer: number }
+```
+
+**Examples:**
+- Easy: "If you have 3 apples and get 2 more, how many do you have?"
+- Medium: "The reactor uses 5 fuel per hour. You have 20 fuel. How many hours?"
+- Hard: "Cafeteria has 8 tables. 2 break. You add 4 new ones. How many total?"
+
+---
+
+### 3. Sliding Tile Puzzle
+**Type:** Spatial/Logic
+**Description:**
+- 4x3 grid (12 tiles total): numbers 0-10, one empty space
+- Goal: Arrange tiles in order (0, 1, 2, 3...), empty space anywhere
+- Player may only slide one adjacent tile into the empty space per action
+- Puzzle is solvable in 5-20 moves (tuned based on player task load)
+- Represented with ASCII art in task prompts
+
+**Shuffle Method:**
+- Start from completed state
+- Make 5-20 random valid moves
+- Avoid 2-move cycles (e.g., move left then immediately right)
+
+**API:**
+```typescript
+POST /api/game/task { action: "slide", taskId: "sliding-tile", tile: number }
+```
+
+**ASCII Representation:**
+```
+ _____ _____ _____ _____
+|  1  |  2  |  3  |  4  |
+|_____|_____|_____|_____|
+|  5  |  6  |  7  |  8  |
+|_____|_____|_____|_____|
+|  9  | 10  |     |     |
+|_____|_____|_____|_____|
+```
+
+---
+
+### 4. Battleship
+**Type:** Spatial/Deduction
+**Description:**
+- 12x12 grid with randomly placed boats of various sizes
+- Player guesses coordinates (e.g., "A5", "G8")
+- Told if hit or miss
+- Goal: Sink 1-2 vessels (tunable based on player task load)
+
+**API:**
+```typescript
+POST /api/game/task { action: "guess", taskId: "battleship", coordinate: string }
+```
+
+**Grid Size Variants:**
+- 8x8 (quick games)
+- 10x10 (balanced)
+- 12x12 (full experience)
+
+---
+
+### 5. Hot-n-Cold
+**Type:** Deduction
+**Description:**
+- Random target number between 0-100
+- Player starts with a random current number
+- Told if current number is less-than or greater-than target
+- Player enters a number to ADD or SUBTRACT from current number
+- New number described as less-than or greater-than target
+- Game ends when target is reached
+
+**API:**
+```typescript
+POST /api/game/task { action: "adjust", taskId: "hot-n-cold", delta: number }
+```
+
+---
+
+### 6. Hold The Button
+**Type:** Nerve/Tension
+**Description:**
+- Player presses button to start (state: "holding")
+- Progress bar increases each tick while holding
+- Room alerts still reach player (other movements, bodies found, etc.)
+- Player must decide: continue holding or quit
+- Stopping resets progress
+- Success if button held for full duration
+
+**API:**
+```typescript
+POST /api/game/task { action: "start" | "quit", taskId: "hold-button" }
+```
+
+**Tension Factor:** Not a puzzle — a test of nerve. Player is vulnerable while holding.
+
+---
+
+### 7. Code Breaker
+**Type:** Deduction
+**Description:**
+- Guess a 4-digit secret code (digits 0-9)
+- After each guess, feedback:
+  - X correct position
+  - Y correct value but wrong position
+- Deduction and elimination
+
+**API:**
+```typescript
+POST /api/game/task { action: "guess", taskId: "code-breaker", code: string }
+```
+
+---
+
+### 8. Transfer Fuel
+**Type:** Logic
+**Description:**
+- Two containers (e.g., 5L and 3L), unlimited water source
+- Goal: Measure exactly 4L into the 5L container
+- Actions: Fill, Pour, Empty (per container)
+- Predictable interaction count (stable for workload tuning)
+
+**API:**
+```typescript
+POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer", container: number }
+```
+
+**Variants:**
+- Different container sizes (3L/5L, 4L/7L, etc.)
+- Different target amounts (2L, 3L, 4L)
+
+---
+
+## Task Selection & Workload
+
+**Workload Tuning:**
+- Each task assigned a "difficulty" score (estimated tick count)
+- Player task load = sum of difficulty scores for assigned tasks
+- Harder tasks (sliding tile, battleship) may sink fewer ships to balance
+- Easy tasks (hot-n-cold, hold button) may have higher completion requirements
+
+**Task Assignment:**
+- Map defines task pool per room
+- Each player receives random subset (e.g., 3-5 tasks total)
+- Task difficulty balanced across map for fair play
+
+---
 
 ### 6. Sabotage
 
@@ -379,6 +663,7 @@ These are explicitly NOT being implemented:
 - [x] Voting system with timeout
 - [x] Player ejection
 - [x] Task system with win condition (living crewmates only)
+- [x] Task type definitions (23 tasks for The Skeld)
 - [x] Action logging
 
 ### 🔄 In Progress
@@ -386,7 +671,10 @@ These are explicitly NOT being implemented:
 - [ ] Dark/light theme toggle
 
 ### 📋 Planned (MVP Remaining)
-- [ ] Tick/ping system with waiting state
+- [x] **Tick/ping system architecture** (designed, needs implementation)
+- [x] **Task definitions** (8 tasks designed, needs implementation)
+- [ ] Tick loop with action queue processing
+- [ ] Player state machine (Roaming/Interacting/Waiting/Summoned)
 - [ ] Delayed information (footsteps ambiguity)
 - [ ] Sabotage system (lights, doors, self-destruct)
 - [ ] Vent network
@@ -405,6 +693,27 @@ These are explicitly NOT being implemented:
 
 ---
 
+## Task Implementation Status (8 Designed Tasks)
+
+**Designed & Specified:**
+- [x] Sequence Repetition — Memory task
+- [x] Word-Based Math Puzzle — Logic task (3 tiers)
+- [x] Sliding Tile Puzzle — Spatial task (4x3 grid)
+- [x] Battleship — Deduction task (grid hunting)
+- [x] Hot-n-Cold — Deduction task (binary search)
+- [x] Hold The Button — Tension task (nerve test)
+- [x] Code Breaker — Deduction task (Mastermind variant)
+- [x] Transfer Fuel — Logic task (pouring puzzle)
+
+**Needs Implementation:**
+- [ ] Task classes for each of the 8 tasks
+- [ ] Task state persistence per player
+- [ ] Task interruption handling (sabotage)
+- [ ] Task completion validation
+- [ ] Task difficulty scoring (for workload balancing)
+
+---
+
 ## Technical Architecture
 
 ```
@@ -413,12 +722,15 @@ among-us-ai/
 │   ├── server/
 │   │   └── index.ts          # Bun server, REST endpoints, SSE handler
 │   ├── game/
-│   │   ├── state.ts          # GameState class, phase management
-│   │   ├── coordinator.ts    # GameCoordinator, game flow orchestration
+│   │   ├── state.ts          # GameState class, phase management, actionQueue
+│   │   ├── coordinator.ts    # GameCoordinator, tick loop, action processing
 │   │   ├── rooms.ts          # RoomManager, room data and movement
 │   │   ├── tasks.ts          # TaskManager, task completion and win check
 │   │   ├── voting.ts         # VotingSystem, council and ejection
 │   │   └── imposter.ts       # ImposterAbilities, kill and sabotage
+│   ├── tick/
+│   │   ├── queue.ts          # ActionQueue management
+│   │   └── processor.ts      # Tick loop and action execution
 │   ├── lobby/
 │   │   └── manager.ts        # LobbyManager, player joining and countdown
 │   ├── sse/
@@ -427,7 +739,7 @@ among-us-ai/
 │   │   └── logger.ts         # ActionLogger, game history
 │   ├── tasks/
 │   │   ├── types.ts          # Task type definitions
-│   │   ├── definitions/      # Per-map task definitions
+│   │   ├── definitions/      # Task implementations (sequence, math, etc.)
 │   │   └── index.ts          # Task registry
 │   └── types/
 │       └── game.ts           # All Zod schemas and TypeScript types
@@ -440,12 +752,19 @@ among-us-ai/
 ├── tests/
 │   ├── game/                 # Game logic tests
 │   ├── lobby/                # Lobby tests
+│   ├── tasks/                # Task implementation tests
 │   └── framework/            # Test utilities
 ├── docs/
 │   ├── notes/                # Reference notes (Among Us rules, libraries)
 │   └── plans/                # Planning documents (this file)
 └── package.json
 ```
+
+**Action Queue:**
+- Stored in `GameState.actionQueue`
+- Processed by `GameCoordinator` each tick
+- Structure: `{ playerId, action, timestamp, payload }`
+- Actions executed in order of submission
 
 ---
 
@@ -466,10 +785,22 @@ among-us-ai/
 
 ## Questions / Open Items
 
-1. **Sabotage cooldown:** Is 60s good? Different per type?
-2. **Delayed information timing:** 2-5 ticks = 10-25 seconds. Is that right?
-3. **Logs content:** What counts as "key actions" vs "everything"?
-4. **Production maps:** Need to design 2 maps with unique characteristics
+### Tick System
+1. **Tick timing:** Currently 5s, target 2s. Is 1s too fast for AI agents?
+2. **Action timeout:** 30s to respond. Is this too generous?
+3. **Queue processing order:** Should actions process in submission order, or should priority be given to certain actions (e.g., kill)?
+
+### Tasks
+4. **Task difficulty scoring:** How to assign difficulty scores (tick estimates) to each task for workload balancing?
+5. **Sliding tile shuffle:** 5-20 moves. Is this range wide enough for meaningful difficulty variance?
+6. **Battleship grid size:** 8x8 vs 10x10 vs 12x12. Which should be default?
+7. **Hold button duration:** How long should the button need to be held? 15s? 30s? 60s?
+
+### General
+8. **Sabotage cooldown:** Is 60s good? Different per type?
+9. **Delayed information timing:** 2-5 ticks = 10-25 seconds. Is that right?
+10. **Logs content:** What counts as "key actions" vs "everything"?
+11. **Production maps:** Need to design 2 maps with unique characteristics
 
 ---
 
