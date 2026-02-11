@@ -49,6 +49,8 @@ export enum EventType {
   PLAYER_EJECTED = 'PlayerEjected',
   PLAYER_KILLED = 'PlayerKilled', // Broadcast when a player is killed
   YOU_DIED = 'YouDied', // Private event sent to victim
+  TASK_COMPLETED = 'TaskCompleted',
+  TASK_FAILED = 'TaskFailed',
   ROUND_STARTED = 'RoundStarted',
   ROUND_ENDED = 'RoundEnded',
   GAME_STARTED = 'GameStarted',
@@ -210,6 +212,17 @@ export const PlayerKilledPayload = z.object({
 });
 export const YouDiedPayload = z.object({ killerId: z.string() });
 
+export const TaskCompletedPayload = z.object({
+  playerId: z.string(),
+  taskId: z.string(),
+  location: PlayerLocationSchema,
+});
+export const TaskFailedPayload = z.object({
+  playerId: z.string(),
+  taskId: z.string(),
+  reason: z.string(),
+});
+
 // Event Schemas
 export const PlayerJoinedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.PLAYER_JOINED),
@@ -283,6 +296,14 @@ export const YouDiedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.YOU_DIED),
   payload: YouDiedPayload,
 });
+export const TaskCompletedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.TASK_COMPLETED),
+  payload: TaskCompletedPayload,
+});
+export const TaskFailedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.TASK_FAILED),
+  payload: TaskFailedPayload,
+});
 
 // Lobby Event Schemas
 export const PlayerJoinedLobbyEventSchema = BaseEventSchema.extend({
@@ -335,5 +356,9 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   GameEndedEventSchema,
   GameOverSummaryEventSchema,
   RoleRevealedEventSchema,
+  PlayerKilledEventSchema,
+  YouDiedEventSchema,
+  TaskCompletedEventSchema,
+  TaskFailedEventSchema,
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;

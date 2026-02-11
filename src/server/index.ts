@@ -4,6 +4,7 @@ import { GameCoordinator } from '@/game/coordinator';
 import { LobbyManager } from '@/lobby/manager';
 import { Player, PlayerRole, PlayerStatus } from '@/types/game';
 import { RoomManager } from '@/game/rooms';
+import { TaskManager } from '@/game/tasks';
 
 /**
  * Bun HTTP Server
@@ -14,6 +15,7 @@ export class GameServer {
   private gameState: GameState;
   private lobbyManager: LobbyManager;
   private gameCoordinator: GameCoordinator;
+  private taskManager: TaskManager;
   private port: number;
   private hostname: string;
 
@@ -27,6 +29,7 @@ export class GameServer {
       this.gameState,
       this.gameState.getSSEManager(),
     );
+    this.taskManager = new TaskManager(this.gameState, this.gameState.getSSEManager());
   }
 
   /**
@@ -304,6 +307,35 @@ export class GameServer {
             console.error('Error casting vote:', err);
             return Response.json(
               { error: 'Failed to cast vote' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Attempt task
+        if (url.pathname === '/api/game/task' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, taskId, minigameResult } = body as {
+              playerId: string;
+              taskId: string;
+              minigameResult?: boolean;
+            };
+
+            if (!playerId || !taskId) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, taskId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const result = this.taskManager.attemptTask(playerId, taskId, minigameResult);
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error attempting task:', err);
+            return Response.json(
+              { error: 'Failed to attempt task' },
               { status: 500, headers: corsHeaders },
             );
           }
