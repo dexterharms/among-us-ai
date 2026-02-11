@@ -83,11 +83,11 @@ export class TaskManager {
 
     player.tasks.push(taskId);
 
-    const crewmateCount = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.CREWMATE,
+    const livingCrewmateCount = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.CREWMATE && p.status === PlayerStatus.ALIVE,
     ).length;
 
-    const totalPossibleTasks = this.totalTasks * crewmateCount;
+    const totalPossibleTasks = this.totalTasks * livingCrewmateCount;
     const completedTasks = this.getCompletedTaskCount();
     const overallProgress =
       totalPossibleTasks > 0 ? Math.round((completedTasks / totalPossibleTasks) * 100) : 0;
@@ -123,10 +123,14 @@ export class TaskManager {
     };
   }
 
+  /**
+   * Get the count of completed tasks from LIVING crewmates only.
+   * Dead crewmates' tasks do not count toward the win condition.
+   */
   getCompletedTaskCount(): number {
     let count = 0;
     this.gameState.players.forEach((player) => {
-      if (player.tasks) {
+      if (player.status === PlayerStatus.ALIVE && player.role === PlayerRole.CREWMATE && player.tasks) {
         count += player.tasks.length;
       }
     });
