@@ -299,16 +299,16 @@ POST /api/game/task { action: "submit", taskId: "word-math", answer: number }
 ### 3. Sliding Tile Puzzle
 **Type:** Spatial/Logic
 **Description:**
-- 4x3 grid (12 tiles total): numbers 0-10, one empty space
+- 4x3 grid (12 tiles total): numbers 0-10 + one empty space
 - Goal: Arrange tiles in order (0, 1, 2, 3...), empty space anywhere
 - Player may only slide one adjacent tile into the empty space per action
-- Puzzle is solvable in 5-20 moves (tuned based on player task load)
+- Puzzle is solvable in 5-20 moves (task-load tuning)
 - Represented with ASCII art in task prompts
 
 **Shuffle Method:**
 - Start from completed state
 - Make 5-20 random valid moves
-- Avoid 2-move cycles (e.g., move left then immediately right)
+- Simplify all cycles before counting moves (e.g., sequences like `left right`, or `up up down down`, or `up right down left` are REMOVED from the full sequence by identifying tile-position pairs and deleting the actions between identical pairs EG: `left right` means tile 8-C moves `left` to 8-B then `right` to 8-C again -> the identical tile-position pairs (8-C) make a loop -> the intermediate actions (`left right` that move the tile-position from 8-C to 8-C can be removed)
 
 **API:**
 ```typescript
@@ -318,11 +318,11 @@ POST /api/game/task { action: "slide", taskId: "sliding-tile", tile: number }
 **ASCII Representation:**
 ```
  _____ _____ _____ _____
-|  1  |  2  |  3  |  4  |
+|  0  |  1  |  2  |  3  |
 |_____|_____|_____|_____|
-|  5  |  6  |  7  |  8  |
+|  4  |  5  |  6  |  7  |
 |_____|_____|_____|_____|
-|  9  | 10  |     |     |
+|  8  |  9  | 10  |     |
 |_____|_____|_____|_____|
 ```
 
@@ -331,20 +331,15 @@ POST /api/game/task { action: "slide", taskId: "sliding-tile", tile: number }
 ### 4. Battleship
 **Type:** Spatial/Deduction
 **Description:**
-- 12x12 grid with randomly placed boats of various sizes
+- 12x12, 10x10, or 8x8 grid (subject to task-rules tuning) with randomly placed boats of various sizes
 - Player guesses coordinates (e.g., "A5", "G8")
 - Told if hit or miss
-- Goal: Sink 1-2 vessels (tunable based on player task load)
+- Goal: Sink 1-3 vessels (subject to task-load tuning)
 
 **API:**
 ```typescript
 POST /api/game/task { action: "guess", taskId: "battleship", coordinate: string }
 ```
-
-**Grid Size Variants:**
-- 8x8 (quick games)
-- 10x10 (balanced)
-- 12x12 (full experience)
 
 ---
 
@@ -357,6 +352,7 @@ POST /api/game/task { action: "guess", taskId: "battleship", coordinate: string 
 - Player enters a number to ADD or SUBTRACT from current number
 - New number described as less-than or greater-than target
 - Game ends when target is reached
+- Not very tunable unless we have multiple games to do.
 
 **API:**
 ```typescript
@@ -374,6 +370,9 @@ POST /api/game/task { action: "adjust", taskId: "hot-n-cold", delta: number }
 - Player must decide: continue holding or quit
 - Stopping resets progress
 - Success if button held for full duration
+- N ticks to hold is subject to task-load tuning
+- N ticks to hold is CONSTANT. The player's LLM speed doesn't determine the max number of ticks. EG: If there are 5 ticks to clear at 5s/t, and the player's LLM returns after 8s, then the ticks will look like this: tick (0%), skipped (20%, unannounced to the player), tick (40%), skipped (60%, unannounced), tick (80%), skipped (100%), tick (100%). Here the player's LLM speed *did* matter as it meant they had to wait an extra tick. But generally, speaking, you won't have to wait 5*8s ticks, it's still 5*5s OR 6*5s (possible 1 tick error). Slower LLMs would be even longer.
+
 
 **API:**
 ```typescript
@@ -426,6 +425,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 - Player task load = sum of difficulty scores for assigned tasks
 - Harder tasks (sliding tile, battleship) may sink fewer ships to balance
 - Easy tasks (hot-n-cold, hold button) may have higher completion requirements
+- Some tasks are not task-load tunable. 
 
 **Task Assignment:**
 - Map defines task pool per room
