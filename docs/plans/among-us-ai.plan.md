@@ -292,7 +292,7 @@ POST /api/game/task { action: "submit", taskId: "word-math", answer: number }
 **Examples:**
 - Easy: "If you have 3 apples and get 2 more, how many do you have?"
 - Medium: "The reactor uses 5 fuel per hour. You have 20 fuel. How many hours?"
-- Hard: "Cafeteria has 8 tables. 2 break. You add 4 new ones. How many total?"
+- Hard: "The main hall has 8 tables. 2 break. You add 4 new ones. How many total?"
 
 ---
 
@@ -541,7 +541,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 - Updates based on game state (bloodstains after kill, flickering lights during sabotage, etc.)
 
 **Examples:**
-- "The electrical room hums with power. Cables snake along the walls."
+- "The power room hums with energy. Cables snake along the walls."
 - "Something feels wrong here. There's a stain on the floor that wasn't here before."
 - "The emergency lights cast everything in a dim red glow. Exit signs glow above the doorways."
 
@@ -562,7 +562,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 - `map0` — Test map (basic layout for development)
 
 **Planned:**
-- 2 production maps (simpler than real Among Us maps, but inspired by them)
+- 2 production maps
 - Each map has unique sabotage locations
 - Each map has unique crew advantages (logs room location, etc.)
 
@@ -663,7 +663,7 @@ These are explicitly NOT being implemented:
 - [x] Voting system with timeout
 - [x] Player ejection
 - [x] Task system with win condition (living crewmates only)
-- [x] Task type definitions (23 tasks for The Skeld)
+- [x] Task type definitions (tasks for Map 0)
 - [x] Action logging
 
 ### 🔄 In Progress
