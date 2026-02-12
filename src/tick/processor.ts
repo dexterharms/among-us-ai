@@ -1,4 +1,4 @@
-import { GameState, GameEvent, EventType } from '@/types/game';
+import { GameState, GameEvent, EventType, Player, PlayerStatus } from '@/types/game';
 import { ActionQueue, QueuedAction } from './queue';
 import { PlayerStateMachine, PlayerState } from './state-machine';
 import { SSEManager } from '@/sse/manager';
@@ -143,6 +143,31 @@ export class TickProcessor {
   }
 
   /**
+   * Get the appropriate prompt type for a player based on their status
+   * Ghosts can only do tasks; alive players can do all actions
+   */
+  private getPromptType(player: Player): 'action' | 'task' {
+    if (player.status === PlayerStatus.DEAD || player.status === PlayerStatus.EJECTED) {
+      return 'task';
+    }
+    return 'action';
+  }
+
+  /**
+   * Check if an action type is allowed for a player based on their status
+   */
+  private isActionAllowed(player: Player, action: string): boolean {
+    // Ghosts can only do tasks, move, and vent
+    if (player.status === PlayerStatus.DEAD || player.status === PlayerStatus.EJECTED) {
+      const allowedActions = ['move', 'task', 'vent', 'log'];
+      return allowedActions.includes(action);
+    }
+
+    // Alive players can do all actions
+    return true;
+  }
+
+  /**
    * Send ACTION_PROMPT to all non-waiting, non-summoned players
    */
   private promptPlayers(): void {
@@ -150,9 +175,6 @@ export class TickProcessor {
     const promptedPlayers: string[] = [];
 
     this.gameState.players.forEach((player, playerId) => {
-      // Skip dead/ejected players
-      if (player.status !== 'Alive') return;
-
       // Get player's current state
       const playerState = this.stateMachine.getPlayerState(playerId);
 
@@ -178,19 +200,27 @@ export class TickProcessor {
     if (promptedPlayers.length > 0) {
       logger.debug(`Prompted ${promptedPlayers.length} players for actions`);
 
-      const event: GameEvent = {
-        timestamp: now,
-        type: EventType.ACTION_PROMPT,
-        payload: {
-          phase: this.gameState.phase,
-          roundTimer: this.gameState.roundTimer,
-          promptType: 'action',
-          tickNumber: this.currentTickNumber,
-        },
-      };
+      // Send individualized prompts to each player
+      promptedPlayers.forEach(playerId => {
+        const player = this.gameState.players.get(playerId);
+        if (!player) return;
 
-      // Broadcast to all players (but only prompted players should respond)
-      this.sseManager.broadcast(event);
+        const promptType = this.getPromptType(player);
+
+        const event: GameEvent = {
+          timestamp: now,
+          type: EventType.ACTION_PROMPT,
+          payload: {
+            phase: this.gameState.phase,
+            roundTimer: this.gameState.roundTimer,
+            promptType,
+            tickNumber: this.currentTickNumber,
+          },
+        };
+
+        // Send to individual player
+        this.sseManager.sendTo(playerId, event);
+      });
     }
   }
 
@@ -280,12 +310,29 @@ export class TickProcessor {
    * Called by API endpoints when a player submits an action
    */
   queueAction(action: QueuedAction): void {
+    // Validate player exists
+    const player = this.gameState.players.get(action.playerId);
+    if (!player) {
+      logger.warn('Cannot queue action: player not found', { playerId: action.playerId });
+      return;
+    }
+
     // Validate player is in waiting state (can only submit action if prompted)
     const playerState = this.stateMachine.getPlayerState(action.playerId);
     if (playerState !== PlayerState.WAITING && playerState !== PlayerState.INTERACTING) {
       logger.warn('Player tried to submit action while not waiting', {
         playerId: action.playerId,
         currentState: playerState,
+      });
+      return;
+    }
+
+    // Validate action is allowed for player's status (ghosts can only do tasks/vent/move/log)
+    if (!this.isActionAllowed(player, action.action)) {
+      logger.warn('Player tried to submit invalid action for their status', {
+        playerId: action.playerId,
+        playerStatus: player.status,
+        action: action.action,
       });
       return;
     }
