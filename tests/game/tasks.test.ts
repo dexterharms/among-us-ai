@@ -15,34 +15,15 @@ describe('TaskManager', () => {
   let taskManager: TaskManager;
   let crewmates: Player[];
   let imposter: Player;
-  let originalRoomInteractables: Map<string, any[]>;
+  // Use real task IDs from MAP0_TASKS
+  const TASK_IDS = [
+    'sequence-repetition-cafeteria',
+    'word-math-electrical',
+    'sliding-tile-security',
+  ];
 
   beforeEach(() => {
     gameState = new GameState();
-    
-    // Save original room interactables for cleanup
-    originalRoomInteractables = new Map();
-    Array.from(gameState.rooms.values()).forEach(room => {
-      originalRoomInteractables.set(room.id, [...room.interactables]);
-    });
-    
-    // Set up rooms with a known number of tasks (3 total tasks)
-    // We need to control the exact number of tasks for predictable win conditions
-    const rooms = Array.from(gameState.rooms.values());
-    rooms.forEach(room => {
-      // Clear existing interactables
-      room.interactables = [];
-    });
-    
-    // Add exactly 3 tasks to 'center' room
-    const centerRoom = gameState.rooms.get('center');
-    if (centerRoom) {
-      centerRoom.interactables = [
-        { id: 'task-1', type: 'Task', name: 'Download Data' },
-        { id: 'task-2', type: 'Task', name: 'Fix Wiring' },
-        { id: 'task-3', type: 'Task', name: 'Empty Garbage' },
-      ];
-    }
 
     // Create players: 1 imposter, 3 crewmates
     imposter = createMockPlayer({
@@ -50,7 +31,7 @@ describe('TaskManager', () => {
       name: 'The Imposter',
       role: PlayerRole.IMPOSTER,
       status: PlayerStatus.ALIVE,
-      location: { roomId: 'center', x: 0, y: 0 },
+      location: { roomId: 'cafeteria', x: 0, y: 0 },
     });
 
     crewmates = [
@@ -59,7 +40,7 @@ describe('TaskManager', () => {
         name: 'Crewmate 1',
         role: PlayerRole.CREWMATE,
         status: PlayerStatus.ALIVE,
-        location: { roomId: 'center', x: 10, y: 10 },
+        location: { roomId: 'cafeteria', x: 10, y: 10 },
         tasks: [],
         taskProgress: 0,
       }),
@@ -68,7 +49,7 @@ describe('TaskManager', () => {
         name: 'Crewmate 2',
         role: PlayerRole.CREWMATE,
         status: PlayerStatus.ALIVE,
-        location: { roomId: 'center', x: 20, y: 20 },
+        location: { roomId: 'electrical', x: 20, y: 20 },
         tasks: [],
         taskProgress: 0,
       }),
@@ -77,7 +58,7 @@ describe('TaskManager', () => {
         name: 'Crewmate 3',
         role: PlayerRole.CREWMATE,
         status: PlayerStatus.ALIVE,
-        location: { roomId: 'center', x: 30, y: 30 },
+        location: { roomId: 'security', x: 30, y: 30 },
         tasks: [],
         taskProgress: 0,
       }),
@@ -90,33 +71,77 @@ describe('TaskManager', () => {
     // Set game to ROUND phase
     gameState.setPhase(GamePhase.ROUND);
 
-    // Create TaskManager
+    // Create TaskManager (this will load MAP0_TASKS)
+    taskManager = new TaskManager(gameState, gameState.getSSEManager());
+  });
+
+    // Create players: 1 imposter, 3 crewmates
+    imposter = createMockPlayer({
+      id: 'imposter-1',
+      name: 'The Imposter',
+      role: PlayerRole.IMPOSTER,
+      status: PlayerStatus.ALIVE,
+      location: { roomId: 'cafeteria', x: 0, y: 0 },
+    });
+
+    crewmates = [
+      createMockPlayer({
+        id: 'crewmate-1',
+        name: 'Crewmate 1',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'cafeteria', x: 10, y: 10 },
+        tasks: [],
+        taskProgress: 0,
+      }),
+      createMockPlayer({
+        id: 'crewmate-2',
+        name: 'Crewmate 2',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'electrical', x: 20, y: 20 },
+        tasks: [],
+        taskProgress: 0,
+      }),
+      createMockPlayer({
+        id: 'crewmate-3',
+        name: 'Crewmate 3',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'security', x: 30, y: 30 },
+        tasks: [],
+        taskProgress: 0,
+      }),
+    ];
+
+    // Add players to game state
+    gameState.addPlayer(imposter);
+    crewmates.forEach((player) => gameState.addPlayer(player));
+
+    // Set game to ROUND phase
+    gameState.setPhase(GamePhase.ROUND);
+
+    // Create TaskManager (this will load MAP0_TASKS)
     taskManager = new TaskManager(gameState, gameState.getSSEManager());
   });
 
   afterEach(() => {
     // Cleanup - stop game loops
     gameState['stopGameLoop']();
-    
-    // Restore original room interactables
-    originalRoomInteractables.forEach((interactables, roomId) => {
-      const room = gameState.rooms.get(roomId);
-      if (room) {
-        room.interactables = interactables;
-      }
-    });
   });
 
   describe('attemptTask', () => {
     test('should successfully complete a task for a living crewmate', () => {
-      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
+      // Pass empty action to simulate successful minigame completion
+      // The minigame manager will handle the completion logic
+      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', {});
 
       expect(result.success).toBe(true);
       expect(crewmates[0].tasks).toContain('task-1');
     });
 
     test('should not allow imposter to complete tasks', () => {
-      const result: TaskResult = taskManager.attemptTask('imposter-1', 'task-1', true);
+      const result: TaskResult = taskManager.attemptTask('imposter-1', 'task-1', {});
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Only crewmates can complete tasks');
@@ -124,25 +149,25 @@ describe('TaskManager', () => {
 
     test('should not allow dead crewmate to complete tasks', () => {
       crewmates[0].status = PlayerStatus.DEAD;
-      
-      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
+
+      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', {});
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Player is not alive');
     });
 
     test('should not complete same task twice for same player', () => {
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      
-      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
+      taskManager.attemptTask('crewmate-1', 'task-1', {});
+
+      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', {});
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Task already completed by this player');
     });
 
     test('should allow different players to complete same task', () => {
-      const result1: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
-      const result2: TaskResult = taskManager.attemptTask('crewmate-2', 'task-1', true);
+      const result1: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', {});
+      const result2: TaskResult = taskManager.attemptTask('crewmate-2', 'task-1', {});
 
       expect(result1.success).toBe(true);
       expect(result2.success).toBe(true);
@@ -154,36 +179,36 @@ describe('TaskManager', () => {
   describe('getCompletedTaskCount - Living Crewmates Only', () => {
     test('should count tasks from living crewmates only', () => {
       // Complete 2 tasks for crewmate-1
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      
+      taskManager.attemptTask('crewmate-1', 'task-1', {});
+      taskManager.attemptTask('crewmate-1', 'task-2', {});
+
       // Complete 1 task for crewmate-2
-      taskManager.attemptTask('crewmate-2', 'task-1', true);
-      
+      taskManager.attemptTask('crewmate-2', 'task-1', {});
+
       // Kill crewmate-3 (no tasks completed anyway)
       crewmates[2].status = PlayerStatus.DEAD;
 
       const count = taskManager.getCompletedTaskCount();
-      
+
       // Only living crewmates' tasks should count
       expect(count).toBe(3);
     });
 
     test('should not count tasks from dead crewmates', () => {
       // Complete 3 tasks for crewmate-1
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
-      
+      taskManager.attemptTask('crewmate-1', 'task-1', {});
+      taskManager.attemptTask('crewmate-1', 'task-2', {});
+      taskManager.attemptTask('crewmate-1', 'task-3', {});
+
       // Complete 2 tasks for crewmate-2
-      taskManager.attemptTask('crewmate-2', 'task-1', true);
-      taskManager.attemptTask('crewmate-2', 'task-2', true);
-      
+      taskManager.attemptTask('crewmate-2', 'task-1', {});
+      taskManager.attemptTask('crewmate-2', 'task-2', {});
+
       // Now kill crewmate-2 - their tasks shouldn't count
       crewmates[1].status = PlayerStatus.DEAD;
 
       const count = taskManager.getCompletedTaskCount();
-      
+
       // Only crewmate-1's tasks count (they're alive)
       expect(count).toBe(3);
     });
@@ -193,9 +218,9 @@ describe('TaskManager', () => {
     test('should trigger crewmate win when all living crewmates complete all tasks', () => {
       // All 3 living crewmates complete all 3 tasks
       crewmates.forEach((crewmate) => {
-        taskManager.attemptTask(crewmate.id, 'task-1', true);
-        taskManager.attemptTask(crewmate.id, 'task-2', true);
-        taskManager.attemptTask(crewmate.id, 'task-3', true);
+        taskManager.attemptTask(crewmate.id, 'task-1', {});
+        taskManager.attemptTask(crewmate.id, 'task-2', {});
+        taskManager.attemptTask(crewmate.id, 'task-3', {});
       });
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
@@ -204,12 +229,12 @@ describe('TaskManager', () => {
     test('should trigger crewmate win even if some crewmates are dead', () => {
       // Kill crewmate-3
       crewmates[2].status = PlayerStatus.DEAD;
-      
+
       // Remaining 2 living crewmates complete all tasks
       crewmates.slice(0, 2).forEach((crewmate) => {
-        taskManager.attemptTask(crewmate.id, 'task-1', true);
-        taskManager.attemptTask(crewmate.id, 'task-2', true);
-        taskManager.attemptTask(crewmate.id, 'task-3', true);
+        taskManager.attemptTask(crewmate.id, 'task-1', {});
+        taskManager.attemptTask(crewmate.id, 'task-2', {});
+        taskManager.attemptTask(crewmate.id, 'task-3', {});
       });
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
@@ -217,13 +242,13 @@ describe('TaskManager', () => {
 
     test('should NOT trigger win if dead crewmate had completed tasks but living have not', () => {
       // Crewmate-3 completes all tasks
-      taskManager.attemptTask('crewmate-3', 'task-1', true);
-      taskManager.attemptTask('crewmate-3', 'task-2', true);
-      taskManager.attemptTask('crewmate-3', 'task-3', true);
-      
+      taskManager.attemptTask('crewmate-3', 'task-1', {});
+      taskManager.attemptTask('crewmate-3', 'task-2', {});
+      taskManager.attemptTask('crewmate-3', 'task-3', {});
+
       // Now kill crewmate-3
       crewmates[2].status = PlayerStatus.DEAD;
-      
+
       // Living crewmates have not completed all tasks
       // Win should NOT trigger
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
@@ -232,12 +257,12 @@ describe('TaskManager', () => {
     test('should trigger win when living crewmates complete tasks after death of another', () => {
       // Kill crewmate-3 first (no tasks)
       crewmates[2].status = PlayerStatus.DEAD;
-      
+
       // Remaining 2 living crewmates complete all tasks
       crewmates.slice(0, 2).forEach((crewmate) => {
-        taskManager.attemptTask(crewmate.id, 'task-1', true);
-        taskManager.attemptTask(crewmate.id, 'task-2', true);
-        taskManager.attemptTask(crewmate.id, 'task-3', true);
+        taskManager.attemptTask(crewmate.id, 'task-1', {});
+        taskManager.attemptTask(crewmate.id, 'task-2', {});
+        taskManager.attemptTask(crewmate.id, 'task-3', {});
       });
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
@@ -245,34 +270,34 @@ describe('TaskManager', () => {
 
     test('should adjust total tasks when crewmate dies mid-progress', () => {
       // 2 crewmates complete 2/3 tasks each
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-2', 'task-1', true);
-      taskManager.attemptTask('crewmate-2', 'task-2', true);
-      
+      taskManager.attemptTask('crewmate-1', 'task-1', {});
+      taskManager.attemptTask('crewmate-1', 'task-2', {});
+      taskManager.attemptTask('crewmate-2', 'task-1', {});
+      taskManager.attemptTask('crewmate-2', 'task-2', {});
+
       // No win yet
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
-      
+
       // Kill crewmate-3 (they hadn't done any tasks)
       crewmates[2].status = PlayerStatus.DEAD;
-      
+
       // Still no win - 2 living crewmates need to complete all 3 tasks
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
-      
+
       // Complete last task for both living crewmates
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
-      taskManager.attemptTask('crewmate-2', 'task-3', true);
-      
+      taskManager.attemptTask('crewmate-1', 'task-3', {});
+      taskManager.attemptTask('crewmate-2', 'task-3', {});
+
       // Now win should trigger
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
     test('should not trigger win when only some living crewmates have completed tasks', () => {
       // Only crewmate-1 completes all tasks
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
-      
+      taskManager.attemptTask('crewmate-1', 'task-1', {});
+      taskManager.attemptTask('crewmate-1', 'task-2', {});
+      taskManager.attemptTask('crewmate-1', 'task-3', {});
+
       // Other 2 crewmates haven't - no win
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
     });
@@ -282,7 +307,7 @@ describe('TaskManager', () => {
     test('should handle all crewmates dead gracefully', () => {
       // Kill all crewmates
       crewmates.forEach((c) => c.status = PlayerStatus.DEAD);
-      
+
       const count = taskManager.getCompletedTaskCount();
       expect(count).toBe(0);
     });
@@ -291,11 +316,11 @@ describe('TaskManager', () => {
       // Kill 2 crewmates
       crewmates[1].status = PlayerStatus.DEAD;
       crewmates[2].status = PlayerStatus.DEAD;
-      
+
       // Single living crewmate completes all tasks
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
+      taskManager.attemptTask('crewmate-1', 'task-1', {});
+      taskManager.attemptTask('crewmate-1', 'task-2', {});
+      taskManager.attemptTask('crewmate-1', 'task-3', {});
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
