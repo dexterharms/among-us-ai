@@ -15,6 +15,7 @@ import { SSEManager } from '@/sse/manager';
 import { VotingSystem } from './voting';
 import { TickProcessor } from '@/tick';
 import { PlayerState } from '@/tick/state-machine';
+import { TaskManager } from './tasks';
 
 export class GameState {
   phase: GamePhase = GamePhase.LOBBY;
@@ -30,6 +31,7 @@ export class GameState {
   private sseManager: SSEManager;
   private votingSystem: VotingSystem;
   private tickProcessor: TickProcessor;
+  private taskManager: TaskManager;
 
   constructor() {
     this.roomManager = new RoomManager();
@@ -37,6 +39,7 @@ export class GameState {
     this.sseManager = new SSEManager();
     this.votingSystem = new VotingSystem(this, this.sseManager);
     this.tickProcessor = new TickProcessor(this, this.sseManager);
+    this.taskManager = new TaskManager(this, this.sseManager);
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -519,6 +522,13 @@ export class GameState {
    */
   getTickProcessor(): TickProcessor {
     return this.tickProcessor;
+  }
+
+  /**
+   * Get task manager for task assignment and completion
+   */
+  getTaskManager(): TaskManager {
+    return this.taskManager;
   }
 
   // Reset game state for starting a fresh game

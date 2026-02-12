@@ -76,6 +76,9 @@ export class GameCoordinator {
       this.gameState.addPlayer(player);
     });
 
+    // Assign tasks to crewmates (HAR-32)
+    this.gameState.getTaskManager().assignTasksToPlayers();
+
     // Start the first round
     this.gameState.startRound();
 
