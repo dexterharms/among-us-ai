@@ -13,6 +13,8 @@ import { logger } from '@/utils/logger';
 import { ActionLogger } from '@/actions/logger';
 import { SSEManager } from '@/sse/manager';
 import { VotingSystem } from './voting';
+import { TickProcessor } from '@/tick';
+import { PlayerState } from '@/tick/state-machine';
 
 export class GameState {
   phase: GamePhase = GamePhase.LOBBY;
@@ -27,12 +29,14 @@ export class GameState {
   private actionLogger: ActionLogger;
   private sseManager: SSEManager;
   private votingSystem: VotingSystem;
+  private tickProcessor: TickProcessor;
 
   constructor() {
     this.roomManager = new RoomManager();
     this.actionLogger = new ActionLogger();
     this.sseManager = new SSEManager();
     this.votingSystem = new VotingSystem(this, this.sseManager);
+    this.tickProcessor = new TickProcessor(this, this.sseManager);
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -103,7 +107,8 @@ export class GameState {
     };
     this.logAndBroadcast(event);
 
-    this.startRoundLoop();
+    // Start the tick processor for action-based gameplay
+    this.tickProcessor.start();
   }
 
   spawnPlayersInRandomRooms(): void {
@@ -271,6 +276,7 @@ export class GameState {
    */
   cleanup(): void {
     this.stopGameLoop();
+    this.tickProcessor.stop();
     this.votingSystem.cleanup();
   }
 
@@ -380,8 +386,9 @@ export class GameState {
   }
 
   startCouncilPhase(): void {
-    // Stop the game loop during council
+    // Stop the game loop and tick processor during council
     this.stopGameLoop();
+    this.tickProcessor.stop();
 
     // Delegate to VotingSystem
     this.votingSystem.startCouncil(this.deadBodies);
@@ -507,6 +514,13 @@ export class GameState {
     return this.sseManager;
   }
 
+  /**
+   * Get tick processor for action queue and player state machine
+   */
+  getTickProcessor(): TickProcessor {
+    return this.tickProcessor;
+  }
+
   // Reset game state for starting a fresh game
   reset(): void {
     logger.info('Resetting game state', {
@@ -520,5 +534,6 @@ export class GameState {
     this.roundTimer = 0;
     this.deadBodies = [];
     this.stopGameLoop();
+    this.tickProcessor.reset();
   }
 }
