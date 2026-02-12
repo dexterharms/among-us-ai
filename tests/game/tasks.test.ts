@@ -25,6 +25,28 @@ describe('TaskManager', () => {
   beforeEach(() => {
     gameState = new GameState();
 
+    // Add fake task interactables to test rooms BEFORE creating TaskManager
+    // This ensures TaskManager calculates totalTasks correctly
+    const cafeteriaRoom = gameState.rooms.get('cafeteria');
+    const electricalRoom = gameState.rooms.get('electrical');
+    const securityRoom = gameState.rooms.get('security');
+
+    if (cafeteriaRoom) {
+      cafeteriaRoom.interactables.push(
+        { id: 'task-1', type: 'Task', name: 'Test Task 1', action: 'Complete' }
+      );
+    }
+    if (electricalRoom) {
+      electricalRoom.interactables.push(
+        { id: 'task-2', type: 'Task', name: 'Test Task 2', action: 'Complete' }
+      );
+    }
+    if (securityRoom) {
+      securityRoom.interactables.push(
+        { id: 'task-3', type: 'Task', name: 'Test Task 3', action: 'Complete' }
+      );
+    }
+
     // Create players: 1 imposter, 3 crewmates
     imposter = createMockPlayer({
       id: 'imposter-1',
@@ -71,7 +93,8 @@ describe('TaskManager', () => {
     // Set game to ROUND phase
     gameState.setPhase(GamePhase.ROUND);
 
-    // Create TaskManager (this will load MAP0_TASKS)
+    // Create TaskManager AFTER adding tasks to rooms
+    // This ensures calculateTotalTasks() sees the test tasks
     taskManager = new TaskManager(gameState, gameState.getSSEManager());
   });
 
