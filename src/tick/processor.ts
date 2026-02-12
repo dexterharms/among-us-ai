@@ -3,6 +3,7 @@ import { ActionQueue, QueuedAction } from './queue';
 import { PlayerStateMachine, PlayerState } from './state-machine';
 import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
+import { SabotageSystem, SabotageType } from '@/game/sabotage';
 
 /**
  * Tick configuration constants
@@ -383,8 +384,22 @@ export class TickProcessor {
   }
 
   private handleSabotage(playerId: string, payload: any): void {
-    // Delegate to ImposterAbilities (sabotage)
-    logger.debug('Sabotage action queued', { playerId, payload });
+    // Delegate to SabotageSystem
+    const sabotageSystem = this.gameState.getSabotageSystem();
+    const { type, target } = payload;
+
+    // Validate sabotage type
+    if (!type || !Object.values(SabotageType).includes(type)) {
+      logger.warn('Invalid sabotage type', { playerId, type });
+      return;
+    }
+
+    // Attempt sabotage
+    const result = sabotageSystem.attemptSabotage(playerId, type as SabotageType, target);
+
+    if (!result.success) {
+      logger.debug('Sabotage failed', { playerId, type, reason: result.reason });
+    }
   }
 
   private handleReport(playerId: string, payload: any): void {

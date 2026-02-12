@@ -72,9 +72,19 @@ export class ActionLogger {
   /**
    * Clone game state for immutability
    * Deep clone to prevent mutation of logged state
+   * Avoids circular references by manually extracting fields
    */
-  private cloneGameState(state: GameState): GameState {
-    return JSON.parse(JSON.stringify(state));
+  private cloneGameState(state: GameState): any {
+    // Manual clone to avoid circular references (gameState.sabotageSystem.gameState, etc.)
+    return {
+      phase: state.phase,
+      roundNumber: state.roundNumber,
+      roundTimer: state.roundTimer,
+      players: Array.from(state.players.entries()),
+      rooms: Array.from(state.rooms.entries()),
+      deadBodies: state.deadBodies,
+      imposterCount: state.imposterCount,
+    };
   }
 
   /**
