@@ -15,6 +15,7 @@ import { SSEManager } from '@/sse/manager';
 import { VotingSystem } from './voting';
 import { TickProcessor } from '@/tick';
 import { PlayerState } from '@/tick/state-machine';
+import { SabotageSystem } from './sabotage';
 
 export class GameState {
   phase: GamePhase = GamePhase.LOBBY;
@@ -30,6 +31,7 @@ export class GameState {
   private sseManager: SSEManager;
   private votingSystem: VotingSystem;
   private tickProcessor: TickProcessor;
+  private sabotageSystem: SabotageSystem;
 
   constructor() {
     this.roomManager = new RoomManager();
@@ -37,6 +39,7 @@ export class GameState {
     this.sseManager = new SSEManager();
     this.votingSystem = new VotingSystem(this, this.sseManager);
     this.tickProcessor = new TickProcessor(this, this.sseManager);
+    this.sabotageSystem = new SabotageSystem(this, this.sseManager);
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -278,6 +281,7 @@ export class GameState {
     this.stopGameLoop();
     this.tickProcessor.stop();
     this.votingSystem.cleanup();
+    this.sabotageSystem.cleanup();
   }
 
   /**
@@ -285,6 +289,13 @@ export class GameState {
    */
   getVotingSystem(): VotingSystem {
     return this.votingSystem;
+  }
+
+  /**
+   * Get the sabotage system
+   */
+  getSabotageSystem(): SabotageSystem {
+    return this.sabotageSystem;
   }
 
   shouldStartCouncil(): boolean {
@@ -447,6 +458,16 @@ export class GameState {
 
     const currentRoomId = player.location.roomId;
 
+    // Check if movement is blocked by doors sabotage
+    if (this.sabotageSystem.isMovementBlocked(targetRoomId)) {
+      logger.warn('Movement blocked by doors sabotage', {
+        playerId,
+        currentRoomId,
+        targetRoomId,
+      });
+      return false;
+    }
+
     // Validate the movement (check if rooms are connected)
     if (!this.roomManager.validateMovement(currentRoomId, targetRoomId)) {
       logger.warn('Invalid movement: rooms not connected', {
@@ -535,5 +556,6 @@ export class GameState {
     this.deadBodies = [];
     this.stopGameLoop();
     this.tickProcessor.reset();
+    this.sabotageSystem.reset();
   }
 }
