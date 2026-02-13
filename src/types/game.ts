@@ -86,6 +86,7 @@ export const PlayerSchema = z.object({
   taskProgress: z.number().min(0).max(100).optional(), // Optional for imposters
   killCooldown: z.number().min(0).optional(),
   tasks: z.array(z.string()).optional(), // Placeholder for tasks
+  emergencyMeetingsUsed: z.number().min(0).default(0),
 });
 export type Player = z.infer<typeof PlayerSchema>;
 
