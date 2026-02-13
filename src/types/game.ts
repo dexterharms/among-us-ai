@@ -57,6 +57,12 @@ export enum EventType {
   GAME_ENDED = 'GameEnded',
   GAME_OVER_SUMMARY = 'GameOverSummary',
   ROLE_REVEALED = 'RoleRevealed',
+
+  // Sabotage events
+  SABOTAGE_TRIGGERED = 'SabotageTriggered',
+  SABOTAGE_INTERRUPTED = 'SabotageInterrupted',
+  SABOTAGE_FIXED = 'SabotageFixed',
+  SABOTAGE_PROGRESS = 'SabotageProgress',
 }
 
 // --- Schemas & Types ---

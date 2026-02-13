@@ -409,4 +409,11 @@ export class TaskManager {
       this.minigameManager.cleanupMinigame(playerId, minigameType);
     });
   }
+
+  /**
+   * Get the minigame manager (needed for sabotage integration)
+   */
+  getMinigameManager(): MinigameManager {
+    return this.minigameManager;
+  }
 }

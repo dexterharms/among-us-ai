@@ -16,6 +16,8 @@ import { VotingSystem } from './voting';
 import { TickProcessor } from '@/tick';
 import { PlayerState } from '@/tick/state-machine';
 import { TaskManager } from './tasks';
+import { SabotageSystem } from './sabotage';
+import { MinigameManager } from '@/tasks';
 
 export class GameState {
   phase: GamePhase = GamePhase.LOBBY;
@@ -32,14 +34,18 @@ export class GameState {
   private votingSystem: VotingSystem;
   private tickProcessor: TickProcessor;
   private taskManager: TaskManager;
+  private sabotageSystem: SabotageSystem;
+  private minigameManager: MinigameManager;
 
   constructor() {
     this.roomManager = new RoomManager();
     this.actionLogger = new ActionLogger();
     this.sseManager = new SSEManager();
+    this.taskManager = new TaskManager(this, this.sseManager);
+    this.minigameManager = this.taskManager.getMinigameManager();
     this.votingSystem = new VotingSystem(this, this.sseManager);
     this.tickProcessor = new TickProcessor(this, this.sseManager);
-    this.taskManager = new TaskManager(this, this.sseManager);
+    this.sabotageSystem = new SabotageSystem(this, this.sseManager, this.minigameManager);
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -531,6 +537,13 @@ export class GameState {
     return this.taskManager;
   }
 
+  /**
+   * Get sabotage system for imposter abilities
+   */
+  getSabotageSystem(): SabotageSystem {
+    return this.sabotageSystem;
+  }
+
   // Reset game state for starting a fresh game
   reset(): void {
     logger.info('Resetting game state', {
@@ -545,5 +558,6 @@ export class GameState {
     this.deadBodies = [];
     this.stopGameLoop();
     this.tickProcessor.reset();
+    this.sabotageSystem.reset();
   }
 }

@@ -368,8 +368,22 @@ export class TickProcessor {
 
   private handleTask(playerId: string, payload: any): void {
     // Delegate to TaskManager
-    // For now, just log
-    logger.debug('Task action queued', { playerId, payload });
+    const taskManager = this.gameState.getTaskManager();
+
+    if (payload.action === 'start') {
+      const result = taskManager.startTask(playerId, payload.taskId);
+      if (!result.success) {
+        logger.warn('Task start failed', { playerId, taskId: payload.taskId, reason: result.reason });
+      }
+    } else if (payload.action === 'submit') {
+      const result = taskManager.submitTaskAction(playerId, payload.taskId, payload);
+      if (!result.success) {
+        logger.warn('Task action failed', { playerId, taskId: payload.taskId, reason: result.reason });
+      }
+    } else if (payload.action === 'quit') {
+      // Task quit - player abandoned the task
+      logger.debug('Player quit task', { playerId, taskId: payload.taskId });
+    }
   }
 
   private handleKill(playerId: string, payload: any): void {
@@ -383,8 +397,13 @@ export class TickProcessor {
   }
 
   private handleSabotage(playerId: string, payload: any): void {
-    // Delegate to ImposterAbilities (sabotage)
-    logger.debug('Sabotage action queued', { playerId, payload });
+    // Delegate to SabotageSystem
+    const sabotageSystem = this.gameState.getSabotageSystem();
+    const result = sabotageSystem.triggerSabotage(playerId, payload);
+
+    if (!result.success) {
+      logger.warn('Sabotage action failed', { playerId, payload, reason: result.reason });
+    }
   }
 
   private handleReport(playerId: string, payload: any): void {
