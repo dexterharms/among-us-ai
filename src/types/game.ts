@@ -332,16 +332,20 @@ export const TaskFailedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.TASK_FAILED),
   payload: TaskFailedPayload,
 });
-export const SabotageActivatedEventSchema = BaseEventSchema.extend({
-  type: z.literal(EventType.SABOTAGE_ACTIVATED),
+export const SabotageTriggeredEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_TRIGGERED),
   payload: SabotageActivatedPayload,
 });
-export const SabotageUpdatedEventSchema = BaseEventSchema.extend({
-  type: z.literal(EventType.SABOTAGE_UPDATED),
+export const SabotageInterruptedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_INTERRUPTED),
+  payload: z.object({ playerId: z.string(), progressReset: z.boolean() }),
+});
+export const SabotageProgressEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_PROGRESS),
   payload: SabotageUpdatedPayload,
 });
-export const SabotageResolvedEventSchema = BaseEventSchema.extend({
-  type: z.literal(EventType.SABOTAGE_RESOLVED),
+export const SabotageFixedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_FIXED),
   payload: SabotageResolvedPayload,
 });
 
@@ -400,8 +404,9 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   YouDiedEventSchema,
   TaskCompletedEventSchema,
   TaskFailedEventSchema,
-  SabotageActivatedEventSchema,
-  SabotageUpdatedEventSchema,
-  SabotageResolvedEventSchema,
+  SabotageTriggeredEventSchema,
+  SabotageInterruptedEventSchema,
+  SabotageProgressEventSchema,
+  SabotageFixedEventSchema,
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;
