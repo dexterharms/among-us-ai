@@ -6,9 +6,7 @@ export class EmergencyButtonSystem {
   private readonly WARMUP_DURATION_MS = 20000; // 20 seconds
   private readonly MAX_EMERGENCY_MEETINGS_PER_PLAYER = 1;
 
-  constructor(
-    private gameState: GameState,
-  ) {}
+  constructor(private gameState: GameState) {}
 
   /**
    * Check if a player can call an emergency meeting

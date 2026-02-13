@@ -71,13 +71,15 @@ export class RoomManager {
 
   constructor() {
     // Create deep copies of rooms to prevent shared mutable state across tests
-    this.rooms = new Map(ROOMS.map((room) => [
-      room.id,
-      {
-        ...room,
-        interactables: [...room.interactables], // Copy interactables array
-      },
-    ]));
+    this.rooms = new Map(
+      ROOMS.map((room) => [
+        room.id,
+        {
+          ...room,
+          interactables: [...room.interactables], // Copy interactables array
+        },
+      ]),
+    );
   }
 
   getRoom(id: string): Room | undefined {
