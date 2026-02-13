@@ -545,15 +545,13 @@ export class GameServer {
       'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
     };
 
-    // Create new Response with CORS headers
+    // Create new Response with CORS headers, preserving the streaming body
     const sseHeaders = new Headers(response.headers);
     Object.entries(corsHeaders).forEach(([key, value]) => {
       sseHeaders.set(key, value);
     });
 
-    const body = await response.text();
-
-    return new Response(body, {
+    return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
       headers: sseHeaders,
@@ -586,6 +584,16 @@ export class GameServer {
    */
   getPort(): number {
     return this.port;
+  }
+
+  /**
+   * Stop the HTTP server
+   */
+  stop(): void {
+    if (this.server) {
+      this.server.stop();
+      this.server = null;
+    }
   }
 
   /**

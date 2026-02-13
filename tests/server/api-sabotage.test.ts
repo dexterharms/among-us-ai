@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { GameServer } from '@/server/index';
 import { PlayerRole, PlayerStatus, GamePhase } from '@/types/game';
 import { SabotageType } from '@/game/sabotage';
@@ -39,6 +39,10 @@ describe('POST /api/game/sabotage endpoint', () => {
     gameState.addPlayer(imposter);
     gameState.addPlayer(crewmate);
     gameState.phase = GamePhase.ROUND;
+  });
+
+  afterEach(() => {
+    server.stop();
   });
 
   describe('validation', () => {

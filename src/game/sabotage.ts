@@ -61,7 +61,7 @@ export class SabotageSystem {
   attemptSabotage(
     playerId: string,
     sabotageType: SabotageType,
-    targetRoomId?: string
+    targetRoomId?: string,
   ): { success: boolean; reason?: string } {
     const player = this.gameState.players.get(playerId);
 
@@ -97,7 +97,8 @@ export class SabotageSystem {
     }
 
     // Normalize type
-    const normalizedType = sabotageType === SabotageType.LIGHTS_OUT ? SabotageType.LIGHTS : sabotageType;
+    const normalizedType =
+      sabotageType === SabotageType.LIGHTS_OUT ? SabotageType.LIGHTS : sabotageType;
 
     // Check if same type already active
     for (const sabotage of this.activeSabotages.values()) {
@@ -131,10 +132,10 @@ export class SabotageSystem {
       timestamp: now,
       type: EventType.SABOTAGE_TRIGGERED,
       payload: {
-        id: sabotageId,
-        type: normalizedType,
+        sabotageId,
+        type: normalizedType as 'lights' | 'doors' | 'self-destruct',
         target: targetRoomId,
-        imposterId: playerId,
+        message: `${normalizedType} sabotage triggered`,
       },
     };
     this.sseManager.broadcast(event);
@@ -282,9 +283,14 @@ export class SabotageSystem {
   /**
    * Fix a sabotage (legacy API)
    */
-  fixSabotage(playerId: string, fixType: string, fixData?: any): { success: boolean; reason?: string } {
+  fixSabotage(
+    playerId: string,
+    fixType: string,
+    fixData?: any,
+  ): { success: boolean; reason?: string } {
     // Find active sabotage matching fix type
-    const normalizedFixType = fixType === 'lights' || fixType === 'lights-out' ? SabotageType.LIGHTS : fixType;
+    const normalizedFixType =
+      fixType === 'lights' || fixType === 'lights-out' ? SabotageType.LIGHTS : fixType;
 
     for (const [sabotageId, sabotage] of this.activeSabotages) {
       if (sabotage.active) {
@@ -305,7 +311,11 @@ export class SabotageSystem {
   /**
    * Fix lights out sabotage with switch flipping
    */
-  private fixLightsOut(playerId: string, sabotageId: string, switchId: string): { success: boolean; reason?: string } {
+  private fixLightsOut(
+    playerId: string,
+    sabotageId: string,
+    switchId: string,
+  ): { success: boolean; reason?: string } {
     const sabotage = this.activeSabotages.get(sabotageId);
     if (!sabotage || !sabotage.active) {
       return { success: false, reason: 'No active sabotage' };
@@ -320,7 +330,11 @@ export class SabotageSystem {
     flippedSwitches.add(switchId);
     sabotage.flippedSwitches = flippedSwitches;
 
-    logger.debug('Lights sabotage switch flipped', { playerId, switchId, flipped: flippedSwitches.size });
+    logger.debug('Lights sabotage switch flipped', {
+      playerId,
+      switchId,
+      flipped: flippedSwitches.size,
+    });
 
     if (flippedSwitches.size >= 4) {
       this.endSabotage(sabotageId);
@@ -331,10 +345,10 @@ export class SabotageSystem {
       timestamp: Date.now(),
       type: EventType.SABOTAGE_PROGRESS,
       payload: {
-        type: SabotageType.LIGHTS,
-        progress: flippedSwitches.size,
-        total: 4,
-        playerId,
+        sabotageId,
+        type: SabotageType.LIGHTS as 'lights' | 'doors' | 'self-destruct',
+        message: `${flippedSwitches.size}/4 switches flipped`,
+        remainingSeconds: 4 - flippedSwitches.size,
       },
     });
 
@@ -364,8 +378,10 @@ export class SabotageSystem {
       timestamp: Date.now(),
       type: EventType.SABOTAGE_FIXED,
       payload: {
-        type: sabotageType,
-        duration,
+        sabotageId,
+        type: sabotageType as 'lights' | 'doors' | 'self-destruct',
+        reason: 'Fixed by crewmates',
+        success: true,
       },
     };
     this.sseManager.broadcast(event);
@@ -397,9 +413,10 @@ export class SabotageSystem {
         timestamp: Date.now(),
         type: EventType.SABOTAGE_PROGRESS,
         payload: {
-          type: SabotageType.SELF_DESTRUCT,
-          timeRemaining,
-          total: TIMER_DURATION_MS,
+          sabotageId,
+          type: SabotageType.SELF_DESTRUCT as 'lights' | 'doors' | 'self-destruct',
+          message: `Self-destruct in ${Math.ceil(timeRemaining / 1000)} seconds`,
+          remainingSeconds: Math.ceil(timeRemaining / 1000),
         },
       });
 
@@ -415,7 +432,7 @@ export class SabotageSystem {
    */
   private clearSabotageTimer(): void {
     if (this.sabotageTimer) {
-      clearTimeout(this.sabotageTimer);
+      clearInterval(this.sabotageTimer);
       this.sabotageTimer = null;
     }
   }
