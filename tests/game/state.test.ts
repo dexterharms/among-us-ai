@@ -533,4 +533,17 @@ describe('GameState', () => {
       expect(gameState.deadBodies).toHaveLength(0);
     });
   });
+
+  describe('EmergencyButtonSystem Integration', () => {
+    test('should track round start time', () => {
+      const gameState = new GameState();
+      gameState.startRound();
+      expect(gameState.getRoundStartTime()).toBeGreaterThan(0);
+    });
+
+    test('should have EmergencyButtonSystem', () => {
+      const gameState = new GameState();
+      expect(gameState.getEmergencyButtonSystem()).toBeDefined();
+    });
+  });
 });
