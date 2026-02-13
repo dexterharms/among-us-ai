@@ -62,7 +62,7 @@ describe('RoomManager', () => {
     });
 
     test('should return room with interactables', () => {
-      const room = roomManager.getRoom('center') as Room;
+      const room = roomManager.getRoom('council-room') as Room;
 
       expect(room.interactables.length).toBeGreaterThan(0);
       expect(room.interactables[0].id).toBe('emergency-button');
@@ -196,13 +196,20 @@ describe('RoomManager', () => {
   });
 
   describe('Room Interactables', () => {
-    test('should have emergency button in center', () => {
-      const room = roomManager.getRoom('center') as Room;
+    test('should have emergency button in council-room', () => {
+      const room = roomManager.getRoom('council-room') as Room;
       const button = room.interactables.find((i) => i.id === 'emergency-button');
 
       expect(button).toBeDefined();
       expect(button?.type).toBe('Button');
       expect(button?.name).toBe('Emergency Button');
+    });
+
+    test('center room should not have emergency button', () => {
+      const room = roomManager.getRoom('center') as Room;
+      const button = room.interactables.find((i) => i.id === 'emergency-button');
+
+      expect(button).toBeUndefined();
     });
 
     test('should have logs in logs-room', () => {

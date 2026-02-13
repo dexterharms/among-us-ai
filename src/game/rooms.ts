@@ -5,14 +5,7 @@ export const ROOMS: Room[] = [
     id: 'center',
     name: 'Central Hall',
     exits: ['hallway-west', 'hallway-north', 'electrical-room'],
-    interactables: [
-      {
-        id: 'emergency-button',
-        type: 'Button',
-        name: 'Emergency Button',
-        action: 'Call Council',
-      },
-    ],
+    interactables: [],
     position: { x: 0, y: 0 },
   },
   {
@@ -26,7 +19,14 @@ export const ROOMS: Room[] = [
     id: 'council-room',
     name: 'Council Room',
     exits: ['hallway-west'],
-    interactables: [],
+    interactables: [
+      {
+        id: 'emergency-button',
+        type: 'Button',
+        name: 'Emergency Button',
+        action: 'Call Council',
+      },
+    ],
     position: { x: -2, y: 0 },
   },
   {
