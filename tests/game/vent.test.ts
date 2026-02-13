@@ -75,6 +75,16 @@ describe('ImposterAbilities - Vent System', () => {
       const result = imposterAbilities['canVent'](imposter.id, 'center');
       expect(result).toBe(false);
     });
+
+    test('returns false when player does not exist', () => {
+      const result = imposterAbilities['canVent']('non-existent-player', 'center');
+      expect(result).toBe(false);
+    });
+
+    test('returns false when target room does not exist', () => {
+      const result = imposterAbilities['canVent'](imposter.id, 'non-existent-room');
+      expect(result).toBe(false);
+    });
   });
 
   describe('attemptVent', () => {
@@ -110,12 +120,13 @@ describe('ImposterAbilities - Vent System', () => {
 
     test('should move imposter to connected vent room', () => {
       const hallwayRoom = gameState.rooms.get('hallway-west');
+      expect(hallwayRoom).toBeDefined();
 
       imposterAbilities.attemptVent(imposter.id, 'hallway-west');
 
       expect(imposter.location.roomId).toBe('hallway-west');
-      expect(imposter.location.x).toBe(hallwayRoom?.position.x ?? 0);
-      expect(imposter.location.y).toBe(hallwayRoom?.position.y ?? 0);
+      expect(imposter.location.x).toBe(hallwayRoom!.position.x);
+      expect(imposter.location.y).toBe(hallwayRoom!.position.y);
     });
 
     test('should fail if player is not imposter', () => {
@@ -171,6 +182,21 @@ describe('ImposterAbilities - Vent System', () => {
 
       expect(imposter.location).toEqual(originalLocation);
     });
+
+    test('should not crash when player does not exist', () => {
+      // Should not throw and should not crash
+      imposterAbilities.attemptVent('non-existent-player', 'hallway-west');
+      // Verify imposter location unchanged (sanity check)
+      expect(imposter.location.roomId).toBe('center');
+    });
+
+    test('should not crash when target room does not exist', () => {
+      const originalLocation = { ...imposter.location };
+
+      imposterAbilities.attemptVent(imposter.id, 'non-existent-room');
+
+      expect(imposter.location).toEqual(originalLocation);
+    });
   });
 
   describe('ventCooldown', () => {
@@ -204,9 +230,8 @@ describe('ImposterAbilities - Vent System', () => {
       gameState.setPhase(GamePhase.ROUND);
     });
 
-    test('should have VENT_COOLDOWN defined', () => {
-      expect(imposterAbilities['VENT_COOLDOWN']).toBeDefined();
-      expect(typeof imposterAbilities['VENT_COOLDOWN']).toBe('number');
+    test('should have VENT_COOLDOWN set to 30000ms (30 seconds)', () => {
+      expect(imposterAbilities['VENT_COOLDOWN']).toBe(30000);
     });
 
     test('should set cooldown after venting', () => {
