@@ -522,6 +522,31 @@ export class GameServer {
           }
         }
 
+        // API: Call emergency meeting
+        if (url.pathname === '/api/game/emergency' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId } = body as { playerId: string };
+
+            if (!playerId) {
+              return Response.json(
+                { error: 'Missing required field: playerId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const result = this.gameState.callEmergency(playerId);
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error calling emergency:', err);
+            return Response.json(
+              { error: 'Failed to call emergency meeting' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
         // 404
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       },
