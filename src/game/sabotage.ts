@@ -1,20 +1,24 @@
-import { GameState, GameEvent, EventType, Player, PlayerStatus } from '@/types/game';
+import { GameState, GameEvent, EventType, PlayerStatus, GamePhase } from '@/types/game';
 import { SSEManager } from '@/sse/manager';
 import { MinigameManager, MinigameType } from '@/tasks';
 import { logger } from '@/utils/logger';
 
 export enum SabotageType {
-  LIGHTS_OUT = 'lights-out',
+  LIGHTS = 'lights',
+  LIGHTS_OUT = 'lights-out', // Alias for backward compatibility
   DOORS = 'doors',
   SELF_DESTRUCT = 'self-destruct',
 }
 
 export interface SabotageState {
+  id: string;
   type: SabotageType;
   active: boolean;
   startedAt: number;
   target?: string; // Room-specific for doors
   timeRemaining?: number; // For self-destruct
+  contributors?: Set<string>; // Players who have contributed to fix
+  flippedSwitches?: Set<string>; // For lights
 }
 
 export interface SabotageAction {
@@ -31,23 +35,34 @@ export interface SabotageAction {
 export class SabotageSystem {
   private gameState: GameState;
   private sseManager: SSEManager;
-  private minigameManager: MinigameManager;
-  private currentSabotage: SabotageState | null = null;
+  private minigameManager: MinigameManager | null;
+  private activeSabotages: Map<string, SabotageState> = new Map();
   private readonly SABOTAGE_COOLDOWN_MS = 60000; // 60 seconds
-  private lastSabotageTime: number = 0;
+  private sabotageCooldowns: Map<string, number> = new Map(); // Per-player cooldowns
   private sabotageTimer: Timer | null = null;
+  private sabotageIdCounter = 0;
 
-  constructor(gameState: GameState, sseManager: SSEManager, minigameManager: MinigameManager) {
+  constructor(gameState: GameState, sseManager: SSEManager, minigameManager?: MinigameManager) {
     this.gameState = gameState;
     this.sseManager = sseManager;
-    this.minigameManager = minigameManager;
+    this.minigameManager = minigameManager || null;
   }
 
   /**
-   * Trigger a sabotage
-   * Imposter-only action
+   * Generate unique sabotage ID
    */
-  triggerSabotage(playerId: string, action: SabotageAction): { success: boolean; reason?: string } {
+  private generateSabotageId(): string {
+    return `sabotage-${++this.sabotageIdCounter}`;
+  }
+
+  /**
+   * Attempt to trigger a sabotage (test-compatible API)
+   */
+  attemptSabotage(
+    playerId: string,
+    sabotageType: SabotageType,
+    targetRoomId?: string
+  ): { success: boolean; reason?: string } {
     const player = this.gameState.players.get(playerId);
 
     if (!player) {
@@ -55,45 +70,70 @@ export class SabotageSystem {
     }
 
     if (player.role !== 'Imposter') {
-      return { success: false, reason: 'Only imposters can trigger sabotage' };
+      return { success: false, reason: 'Only imposters can sabotage' };
     }
 
     if (player.status !== PlayerStatus.ALIVE) {
       return { success: false, reason: 'Dead imposters cannot sabotage' };
     }
 
-    if (this.currentSabotage && this.currentSabotage.active) {
-      return { success: false, reason: 'Sabotage already in progress' };
+    // Check game phase
+    if (this.gameState.phase !== GamePhase.ROUND) {
+      return { success: false, reason: 'Can only sabotage during round phase' };
     }
 
-    // Check cooldown
+    // Check per-player cooldown
     const now = Date.now();
-    const timeSinceLastSabotage = now - this.lastSabotageTime;
+    const lastSabotageTime = this.sabotageCooldowns.get(playerId) || 0;
+    const timeSinceLastSabotage = now - lastSabotageTime;
     if (timeSinceLastSabotage < this.SABOTAGE_COOLDOWN_MS) {
       const remainingTime = Math.ceil((this.SABOTAGE_COOLDOWN_MS - timeSinceLastSabotage) / 1000);
       return { success: false, reason: `Sabotage on cooldown: ${remainingTime}s remaining` };
     }
 
-    // Trigger sabotage
-    this.currentSabotage = {
-      type: action.type,
+    // Check for doors sabotage without target
+    if (sabotageType === SabotageType.DOORS && !targetRoomId) {
+      return { success: false, reason: 'Doors sabotage requires target room ID' };
+    }
+
+    // Normalize type
+    const normalizedType = sabotageType === SabotageType.LIGHTS_OUT ? SabotageType.LIGHTS : sabotageType;
+
+    // Check if same type already active
+    for (const sabotage of this.activeSabotages.values()) {
+      if (sabotage.type === normalizedType && sabotage.active) {
+        return { success: false, reason: `${normalizedType} sabotage already active` };
+      }
+    }
+
+    // Create sabotage
+    const sabotageId = this.generateSabotageId();
+    const sabotage: SabotageState = {
+      id: sabotageId,
+      type: normalizedType,
       active: true,
       startedAt: now,
-      target: action.target,
+      target: targetRoomId,
+      contributors: new Set(),
+      flippedSwitches: new Set(),
     };
 
-    this.lastSabotageTime = now;
+    this.activeSabotages.set(sabotageId, sabotage);
+    this.sabotageCooldowns.set(playerId, now);
 
-    // Force all crewmates on tasks to quit
-    this.forceTaskInterruption();
+    // Force task interruption if minigameManager available
+    if (this.minigameManager) {
+      this.forceTaskInterruption();
+    }
 
-    // Broadcast sabotage event
+    // Broadcast sabotage activation
     const event: GameEvent = {
       timestamp: now,
       type: EventType.SABOTAGE_TRIGGERED,
       payload: {
-        type: action.type,
-        target: action.target,
+        id: sabotageId,
+        type: normalizedType,
+        target: targetRoomId,
         imposterId: playerId,
       },
     };
@@ -101,44 +141,51 @@ export class SabotageSystem {
 
     logger.logGameEvent(EventType.SABOTAGE_TRIGGERED, {
       imposterId: playerId,
-      sabotageType: action.type,
-      target: action.target,
+      sabotageType: normalizedType,
+      target: targetRoomId,
+      sabotageId,
     });
 
     // Start timer for self-destruct
-    if (action.type === SabotageType.SELF_DESTRUCT) {
-      this.startSelfDestructTimer();
+    if (normalizedType === SabotageType.SELF_DESTRUCT) {
+      this.startSelfDestructTimer(sabotageId);
     }
 
     return { success: true };
   }
 
   /**
+   * Trigger a sabotage (legacy API)
+   */
+  triggerSabotage(playerId: string, action: SabotageAction): { success: boolean; reason?: string } {
+    const type = action.type === SabotageType.LIGHTS_OUT ? SabotageType.LIGHTS : action.type;
+    return this.attemptSabotage(playerId, type, action.target);
+  }
+
+  /**
    * Force crewmates on tasks to quit due to sabotage
-   * Tasks reset progress depending on type (hold button resets, others don't)
    */
   private forceTaskInterruption(): void {
+    if (!this.minigameManager) return;
+
     const interruptedPlayers: string[] = [];
 
     this.gameState.players.forEach((player, playerId) => {
-      // Only affect living crewmates
       if (player.status !== PlayerStatus.ALIVE || player.role !== 'Crewmate') {
         return;
       }
 
-      // Check if player is interacting (on a task)
       const playerState = this.gameState.tickProcessor?.getStateMachine().getPlayerState(playerId);
       if (playerState !== 'Interacting') {
         return;
       }
 
-      // Check if player has active minigame
       let hasActiveMinigame = false;
       let activeMinigameType: MinigameType | null = null;
 
       for (const minigameType of Object.values(MinigameType)) {
-        const state = this.minigameManager.getMinigameState(playerId, minigameType);
-        if (state && !this.minigameManager.isMinigameComplete(playerId, minigameType)) {
+        const state = this.minigameManager!.getMinigameState(playerId, minigameType);
+        if (state && !this.minigameManager!.isMinigameComplete(playerId, minigameType)) {
           hasActiveMinigame = true;
           activeMinigameType = minigameType;
           break;
@@ -151,28 +198,22 @@ export class SabotageSystem {
 
       interruptedPlayers.push(playerId);
 
-      // Handle task interruption based on minigame type
       if (activeMinigameType === MinigameType.HOLD_BUTTON) {
-        // Hold button resets progress on quit
         logger.debug('Resetting hold-button progress due to sabotage', { playerId });
-        this.minigameManager.cleanupMinigame(playerId, activeMinigameType);
+        this.minigameManager!.cleanupMinigame(playerId, activeMinigameType);
       } else {
-        // Other tasks do not reset progress, just interrupt
         logger.debug('Interrupting task due to sabotage (progress preserved)', {
           playerId,
           minigameType: activeMinigameType,
         });
-        // State is preserved, just transition back to roaming
         this.gameState.tickProcessor?.getStateMachine().transition(playerId, 'Roaming');
       }
 
-      // Send interruption notification to player
       const event: GameEvent = {
         timestamp: Date.now(),
         type: EventType.SABOTAGE_INTERRUPTED,
         payload: {
           playerId,
-          sabotageType: this.currentSabotage?.type,
           progressReset: activeMinigameType === MinigameType.HOLD_BUTTON,
         },
       };
@@ -186,64 +227,111 @@ export class SabotageSystem {
   }
 
   /**
-   * Fix a sabotage
-   * Called by crewmates using interactables
+   * Attempt to fix a sabotage (test-compatible API)
    */
-  fixSabotage(playerId: string, fixType: string, fixData?: any): { success: boolean; reason?: string } {
-    if (!this.currentSabotage || !this.currentSabotage.active) {
-      return { success: false, reason: 'No active sabotage' };
-    }
-
+  attemptFix(playerId: string, sabotageId: string): { success: boolean; reason?: string } {
     const player = this.gameState.players.get(playerId);
+
     if (!player) {
       return { success: false, reason: 'Player not found' };
     }
 
-    if (player.status !== PlayerStatus.ALIVE) {
-      return { success: false, reason: 'Dead players cannot fix sabotage' };
+    if (player.role === 'Imposter') {
+      return { success: false, reason: 'Only crewmates can fix sabotages' };
     }
 
-    // Handle different sabotage fix types
-    switch (this.currentSabotage.type) {
-      case SabotageType.LIGHTS_OUT:
-        return this.fixLightsOut(playerId, fixType);
-      case SabotageType.DOORS:
-        return this.fixDoors(playerId, fixData);
-      case SabotageType.SELF_DESTRUCT:
-        return this.fixSelfDestruct(playerId);
-      default:
-        return { success: false, reason: 'Unknown sabotage type' };
+    const sabotage = this.activeSabotages.get(sabotageId);
+    if (!sabotage || !sabotage.active) {
+      return { success: false, reason: 'Sabotage not found or not active' };
     }
+
+    if (player.status !== PlayerStatus.ALIVE) {
+      return { success: false, reason: 'Dead players cannot fix sabotages' };
+    }
+
+    // Check if player already contributed
+    if (sabotage.contributors?.has(playerId)) {
+      return { success: false, reason: 'You have already contributed to fixing this sabotage' };
+    }
+
+    // For doors, check if player is in the affected room
+    if (sabotage.type === SabotageType.DOORS && sabotage.target) {
+      if (player.location.roomId !== sabotage.target) {
+        return { success: false, reason: 'You must be in the affected room to fix this' };
+      }
+    }
+
+    // Record contribution
+    sabotage.contributors?.add(playerId);
+
+    // Determine if sabotage is fixed based on type
+    if (sabotage.type === SabotageType.SELF_DESTRUCT) {
+      // Self-destruct requires 2 contributors
+      if ((sabotage.contributors?.size || 0) >= 2) {
+        this.endSabotage(sabotageId);
+        return { success: true, reason: 'Sabotage fixed!' };
+      }
+      return { success: true, reason: 'Fix contribution recorded' };
+    }
+
+    // Other sabotage types are fixed by single crewmate
+    this.endSabotage(sabotageId);
+    return { success: true, reason: 'Sabotage fixed!' };
   }
 
   /**
-   * Fix lights out sabotage
-   * All 4 switches must be flipped
+   * Fix a sabotage (legacy API)
    */
-  private fixLightsOut(playerId: string, switchId: string): { success: boolean; reason?: string } {
-    // Track which switches have been flipped
-    const flippedSwitches = this.currentSabotage?.flippedSwitches || new Set<string>();
+  fixSabotage(playerId: string, fixType: string, fixData?: any): { success: boolean; reason?: string } {
+    // Find active sabotage matching fix type
+    const normalizedFixType = fixType === 'lights' || fixType === 'lights-out' ? SabotageType.LIGHTS : fixType;
+
+    for (const [sabotageId, sabotage] of this.activeSabotages) {
+      if (sabotage.active) {
+        const sabotageTypeStr = sabotage.type.toString();
+        if (sabotageTypeStr === normalizedFixType || sabotageTypeStr.includes(normalizedFixType)) {
+          // For lights, handle multi-switch
+          if (sabotage.type === SabotageType.LIGHTS && fixData?.switchId) {
+            return this.fixLightsOut(playerId, sabotageId, fixData.switchId);
+          }
+          return this.attemptFix(playerId, sabotageId);
+        }
+      }
+    }
+
+    return { success: false, reason: 'No active sabotage' };
+  }
+
+  /**
+   * Fix lights out sabotage with switch flipping
+   */
+  private fixLightsOut(playerId: string, sabotageId: string, switchId: string): { success: boolean; reason?: string } {
+    const sabotage = this.activeSabotages.get(sabotageId);
+    if (!sabotage || !sabotage.active) {
+      return { success: false, reason: 'No active sabotage' };
+    }
+
+    const flippedSwitches = sabotage.flippedSwitches || new Set<string>();
 
     if (flippedSwitches.has(switchId)) {
       return { success: false, reason: 'Switch already flipped' };
     }
 
     flippedSwitches.add(switchId);
-    (this.currentSabotage as any).flippedSwitches = flippedSwitches;
+    sabotage.flippedSwitches = flippedSwitches;
 
     logger.debug('Lights sabotage switch flipped', { playerId, switchId, flipped: flippedSwitches.size });
 
-    // Check if all 4 switches are flipped
     if (flippedSwitches.size >= 4) {
-      return this.endSabotage();
+      this.endSabotage(sabotageId);
+      return { success: true };
     }
 
-    // Broadcast progress
     this.sseManager.broadcast({
       timestamp: Date.now(),
       type: EventType.SABOTAGE_PROGRESS,
       payload: {
-        type: SabotageType.LIGHTS_OUT,
+        type: SabotageType.LIGHTS,
         progress: flippedSwitches.size,
         total: 4,
         playerId,
@@ -254,52 +342,24 @@ export class SabotageSystem {
   }
 
   /**
-   * Fix doors sabotage
-   * Correct code must be entered
-   */
-  private fixDoors(playerId: string, codeData: any): { success: boolean; reason?: string } {
-    if (!codeData || !codeData.code) {
-      return { success: false, reason: 'Code required' };
-    }
-
-    // Simple validation: code must match expected format
-    // In a real implementation, the code would be generated and stored when sabotage starts
-    const expectedCode = '1234'; // Placeholder
-    if (codeData.code !== expectedCode) {
-      return { success: false, reason: 'Incorrect code' };
-    }
-
-    return this.endSabotage();
-  }
-
-  /**
-   * Fix self-destruct sabotage
-   * Stop button must be pressed
-   */
-  private fixSelfDestruct(playerId: string): { success: boolean; reason?: string } {
-    // Stop button pressed
-    if (this.sabotageTimer) {
-      clearTimeout(this.sabotageTimer);
-      this.sabotageTimer = null;
-    }
-
-    return this.endSabotage();
-  }
-
-  /**
    * End active sabotage
    */
-  private endSabotage(): { success: boolean; reason?: string } {
-    if (!this.currentSabotage) {
+  private endSabotage(sabotageId: string): { success: boolean; reason?: string } {
+    const sabotage = this.activeSabotages.get(sabotageId);
+    if (!sabotage) {
       return { success: false, reason: 'No active sabotage' };
     }
 
-    const sabotageType = this.currentSabotage.type;
-    const duration = Date.now() - this.currentSabotage.startedAt;
+    const sabotageType = sabotage.type;
+    const duration = Date.now() - sabotage.startedAt;
 
-    this.currentSabotage = null;
+    this.activeSabotages.delete(sabotageId);
 
-    // Broadcast sabotage fixed event
+    // Clear timer if self-destruct
+    if (sabotageType === SabotageType.SELF_DESTRUCT) {
+      this.clearSabotageTimer();
+    }
+
     const event: GameEvent = {
       timestamp: Date.now(),
       type: EventType.SABOTAGE_FIXED,
@@ -321,15 +381,18 @@ export class SabotageSystem {
   /**
    * Start self-destruct timer
    */
-  private startSelfDestructTimer(): void {
-    const TIMER_DURATION_MS = 30000; // 30 seconds
+  private startSelfDestructTimer(sabotageId: string): void {
+    const TIMER_DURATION_MS = 30000;
     let timeRemaining = TIMER_DURATION_MS;
 
     this.sabotageTimer = setInterval(() => {
       timeRemaining -= 1000;
-      (this.currentSabotage as any).timeRemaining = timeRemaining;
 
-      // Broadcast timer update
+      const sabotage = this.activeSabotages.get(sabotageId);
+      if (sabotage) {
+        sabotage.timeRemaining = timeRemaining;
+      }
+
       this.sseManager.broadcast({
         timestamp: Date.now(),
         type: EventType.SABOTAGE_PROGRESS,
@@ -341,7 +404,6 @@ export class SabotageSystem {
       });
 
       if (timeRemaining <= 0) {
-        // Self-destruct complete - imposters win
         this.clearSabotageTimer();
         this.triggerImpostersWin('Self-destruct timer expired');
       }
@@ -376,31 +438,55 @@ export class SabotageSystem {
       },
     });
 
-    this.gameState.phase = 'GameOver';
+    this.gameState.phase = GamePhase.GAME_OVER;
   }
 
   /**
-   * Get current sabotage state
+   * Get all active sabotages (test-compatible API)
+   */
+  getActiveSabotages(): SabotageState[] {
+    return Array.from(this.activeSabotages.values()).filter((s) => s.active);
+  }
+
+  /**
+   * Get current sabotage state (legacy API)
    */
   getCurrentSabotage(): SabotageState | null {
-    return this.currentSabotage;
+    const active = this.getActiveSabotages();
+    return active.length > 0 ? active[0] : null;
   }
 
   /**
    * Check if sabotage is active
    */
   isSabotageActive(): boolean {
-    return this.currentSabotage?.active || false;
+    return this.getActiveSabotages().length > 0;
   }
 
   /**
-   * Get sabotage cooldown remaining (in seconds)
+   * Check if movement is blocked for a room (doors sabotage)
    */
-  getCooldownRemaining(): number {
-    const now = Date.now();
-    const timeSinceLastSabotage = now - this.lastSabotageTime;
-    const remaining = Math.max(0, this.SABOTAGE_COOLDOWN_MS - timeSinceLastSabotage);
-    return Math.ceil(remaining / 1000);
+  isMovementBlocked(roomId: string): boolean {
+    for (const sabotage of this.activeSabotages.values()) {
+      if (sabotage.active && sabotage.type === SabotageType.DOORS && sabotage.target === roomId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get sabotage cooldown remaining for a player (in seconds)
+   */
+  getCooldownRemaining(playerId?: string): number {
+    if (playerId) {
+      const lastTime = this.sabotageCooldowns.get(playerId) || 0;
+      const now = Date.now();
+      const timeSince = now - lastTime;
+      return Math.max(0, Math.ceil((this.SABOTAGE_COOLDOWN_MS - timeSince) / 1000));
+    }
+    // Legacy: return 0 if no playerId specified
+    return 0;
   }
 
   /**
@@ -408,8 +494,8 @@ export class SabotageSystem {
    */
   reset(): void {
     this.clearSabotageTimer();
-    this.currentSabotage = null;
-    this.lastSabotageTime = 0;
+    this.activeSabotages.clear();
+    this.sabotageCooldowns.clear();
   }
 
   /**
