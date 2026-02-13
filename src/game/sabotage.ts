@@ -176,7 +176,7 @@ export class SabotageSystem {
         return;
       }
 
-      const playerState = this.gameState.tickProcessor?.getStateMachine().getPlayerState(playerId);
+      const playerState = this.gameState.tickProcessor?.getStateMachine()?.getPlayerState(playerId);
       if (playerState !== 'Interacting') {
         return;
       }
@@ -207,7 +207,7 @@ export class SabotageSystem {
           playerId,
           minigameType: activeMinigameType,
         });
-        this.gameState.tickProcessor?.getStateMachine().transition(playerId, 'Roaming');
+        this.gameState.tickProcessor?.getStateMachine()?.transition(playerId, 'Roaming');
       }
 
       const event: GameEvent = {
