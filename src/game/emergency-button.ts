@@ -3,7 +3,7 @@ import { PlayerStatus, EventType } from '@/types/game';
 import { logger } from '@/utils/logger';
 
 export class EmergencyButtonSystem {
-  private readonly WARMUP_DURATION_MS = 20000; // 20 seconds
+  public static readonly WARMUP_DURATION_MS = 20000; // 20 seconds
   private readonly MAX_EMERGENCY_MEETINGS_PER_PLAYER = 1;
 
   constructor(private gameState: GameState) {}
@@ -35,8 +35,8 @@ export class EmergencyButtonSystem {
 
     // Check warm-up period has passed
     const elapsed = Date.now() - roundStartTime;
-    if (elapsed < this.WARMUP_DURATION_MS) {
-      const remaining = Math.ceil((this.WARMUP_DURATION_MS - elapsed) / 1000);
+    if (elapsed < EmergencyButtonSystem.WARMUP_DURATION_MS) {
+      const remaining = Math.ceil((EmergencyButtonSystem.WARMUP_DURATION_MS - elapsed) / 1000);
       return { valid: false, reason: `Emergency button is in warm-up (${remaining}s remaining)` };
     }
 

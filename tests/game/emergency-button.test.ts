@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { EmergencyButtonSystem } from '@/game/emergency-button';
 import { GameState } from '@/game/state';
-import { PlayerRole, PlayerStatus } from '@/types/game';
+import { PlayerRole, PlayerStatus, GamePhase } from '@/types/game';
+import { SabotageType } from '@/game/sabotage';
 
 describe('EmergencyButtonSystem', () => {
   let system: EmergencyButtonSystem;
@@ -60,6 +61,35 @@ describe('EmergencyButtonSystem', () => {
       const result = system.canCallEmergency('p1', 'council-room', roundStart);
       expect(result.valid).toBe(false);
       expect(result.reason).toContain('warm-up');
+    });
+
+    test('returns false 1ms before warm-up expires', () => {
+      gameState.addPlayer({
+        id: 'p1',
+        name: 'Player',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'council-room', x: -2, y: 0 },
+        emergencyMeetingsUsed: 0,
+      });
+      const roundStart = Date.now() - 19999; // 1ms before warm-up expires
+      const result = system.canCallEmergency('p1', 'council-room', roundStart);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('warm-up');
+    });
+
+    test('returns true exactly at warm-up boundary', () => {
+      gameState.addPlayer({
+        id: 'p1',
+        name: 'Player',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'council-room', x: -2, y: 0 },
+        emergencyMeetingsUsed: 0,
+      });
+      const roundStart = Date.now() - 20000; // Exactly at warm-up boundary
+      const result = system.canCallEmergency('p1', 'council-room', roundStart);
+      expect(result.valid).toBe(true);
     });
 
     test('returns false if player already used emergency meeting', () => {
@@ -157,11 +187,11 @@ describe('EmergencyButtonSystem', () => {
       });
 
       // Set game phase to ROUND (required for sabotage)
-      gameState.phase = 'Round';
+      gameState.setPhase(GamePhase.ROUND);
 
       // Trigger a sabotage (by the imposter)
       const sabotageSystem = gameState.getSabotageSystem();
-      const sabotageResult = sabotageSystem.triggerSabotage('imposter', { type: 'lights' });
+      const sabotageResult = sabotageSystem.triggerSabotage('imposter', { type: SabotageType.LIGHTS });
       expect(sabotageResult.success).toBe(true);
 
       const roundStart = Date.now() - 30000;

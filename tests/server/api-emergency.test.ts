@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { GameServer } from '@/server/index';
 import { PlayerRole, PlayerStatus, GamePhase } from '@/types/game';
+import { EmergencyButtonSystem } from '@/game/emergency-button';
+import { SabotageType } from '@/game/sabotage';
 
 describe('POST /api/game/emergency endpoint', () => {
   let server: GameServer;
@@ -23,7 +25,7 @@ describe('POST /api/game/emergency endpoint', () => {
       role: PlayerRole.CREWMATE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'council-room', x: 0, y: 0 },
-      tasks: [],
+      emergencyMeetingsUsed: 0,
     };
 
     gameState.addPlayer(player);
@@ -66,8 +68,7 @@ describe('POST /api/game/emergency endpoint', () => {
       const gameState = server.getGameState();
 
       // Mock round start time to be past warm-up (20 seconds)
-      const warmUpDuration = 20000;
-      gameState['roundStartTime'] = Date.now() - warmUpDuration - 1000;
+      gameState['roundStartTime'] = Date.now() - EmergencyButtonSystem.WARMUP_DURATION_MS - 1000;
 
       const response = await fetch(`http://localhost:${port}/api/game/emergency`, {
         method: 'POST',
@@ -142,6 +143,62 @@ describe('POST /api/game/emergency endpoint', () => {
       const body = (await response.json()) as { success: boolean; reason?: string };
       expect(body.success).toBe(false);
       expect(body.reason).toContain('not alive');
+    });
+
+    it('should return failure when player already used emergency meeting', async () => {
+      const gameState = server.getGameState();
+      const player = gameState.players.get('player-1');
+      if (player) {
+        player.emergencyMeetingsUsed = 1; // Already used
+      }
+
+      // Mock round start time to be past warm-up
+      gameState['roundStartTime'] = Date.now() - EmergencyButtonSystem.WARMUP_DURATION_MS - 1000;
+
+      const response = await fetch(`http://localhost:${port}/api/game/emergency`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: 'player-1' }),
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { success: boolean; reason?: string };
+      expect(body.success).toBe(false);
+      expect(body.reason).toContain('already used');
+    });
+
+    it('should return failure during active sabotage', async () => {
+      const gameState = server.getGameState();
+
+      // Add an imposter to trigger sabotage
+      const imposter = {
+        id: 'imposter-1',
+        name: 'Imposter One',
+        role: PlayerRole.IMPOSTER,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'council-room', x: -2, y: 0 },
+        emergencyMeetingsUsed: 0,
+      };
+      gameState.addPlayer(imposter);
+
+      // Mock round start time to be past warm-up
+      gameState['roundStartTime'] = Date.now() - EmergencyButtonSystem.WARMUP_DURATION_MS - 1000;
+
+      // Trigger lights sabotage
+      const sabotageSystem = gameState.getSabotageSystem();
+      const sabotageResult = sabotageSystem.triggerSabotage('imposter-1', { type: SabotageType.LIGHTS });
+      expect(sabotageResult.success).toBe(true);
+
+      const response = await fetch(`http://localhost:${port}/api/game/emergency`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: 'player-1' }),
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { success: boolean; reason?: string };
+      expect(body.success).toBe(false);
+      expect(body.reason).toContain('sabotage');
     });
   });
 });
