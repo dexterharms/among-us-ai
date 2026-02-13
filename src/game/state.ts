@@ -18,6 +18,7 @@ import { PlayerState } from '@/tick/state-machine';
 import { TaskManager } from './tasks';
 import { SabotageSystem } from './sabotage';
 import { MinigameManager } from '@/tasks';
+import { EmergencyButtonSystem } from './emergency-button';
 
 export class GameState {
   private phase: GamePhase = GamePhase.LOBBY;
@@ -52,6 +53,8 @@ export class GameState {
   private taskManager: TaskManager;
   private sabotageSystem: SabotageSystem;
   private minigameManager: MinigameManager;
+  private roundStartTime: number = 0;
+  private emergencyButtonSystem: EmergencyButtonSystem;
 
   constructor() {
     this.roomManager = new RoomManager();
@@ -62,6 +65,7 @@ export class GameState {
     this.votingSystem = new VotingSystem(this, this.sseManager);
     this.tickProcessor = new TickProcessor(this, this.sseManager);
     this.sabotageSystem = new SabotageSystem(this, this.sseManager, this.minigameManager);
+    this.emergencyButtonSystem = new EmergencyButtonSystem(this);
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -115,6 +119,7 @@ export class GameState {
     this.phase = GamePhase.ROUND;
     this.roundNumber += 1;
     this.roundTimer = this.ROUND_DURATION_SECONDS;
+    this.roundStartTime = Date.now();
     // Clear dead bodies at the start of each round
     this._deadBodies = [];
 
@@ -577,6 +582,35 @@ export class GameState {
     return this.sabotageSystem;
   }
 
+  /**
+   * Get the round start time (for emergency button warm-up)
+   */
+  getRoundStartTime(): number {
+    return this.roundStartTime;
+  }
+
+  /**
+   * Get the emergency button system
+   */
+  getEmergencyButtonSystem(): EmergencyButtonSystem {
+    return this.emergencyButtonSystem;
+  }
+
+  /**
+   * Call an emergency meeting
+   */
+  callEmergency(playerId: string): { success: boolean; reason?: string } {
+    const player = this._players.get(playerId);
+    if (!player) {
+      return { success: false, reason: 'Player not found' };
+    }
+    return this.emergencyButtonSystem.callEmergency(
+      playerId,
+      player.location.roomId,
+      this.roundStartTime,
+    );
+  }
+
   // Reset game state for starting a fresh game
   reset(): void {
     logger.info('Resetting game state', {
@@ -588,9 +622,11 @@ export class GameState {
     this.phase = GamePhase.LOBBY;
     this.roundNumber = 0;
     this.roundTimer = 0;
+    this.roundStartTime = 0;
     this._deadBodies = [];
     this.stopGameLoop();
     this.tickProcessor.reset();
     this.sabotageSystem.reset();
+    this.emergencyButtonSystem.reset();
   }
 }
