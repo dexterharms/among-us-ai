@@ -27,6 +27,7 @@ export class GameState {
   rooms: Map<string, Room> = new Map();
   deadBodies: Array<DeadBody> = [];
 
+  private readonly ROUND_DURATION_SECONDS = 300; // 5 minutes per round per HAR-110
   private roomManager: RoomManager;
   private gameLoopInterval: Timer | null = null;
   private actionLogger: ActionLogger;
@@ -94,7 +95,7 @@ export class GameState {
     const previousPhase = this.phase;
     this.phase = GamePhase.ROUND;
     this.roundNumber += 1;
-    this.roundTimer = 300; // 5 minutes (300 seconds) per round per HAR-110
+    this.roundTimer = this.ROUND_DURATION_SECONDS;
     this.deadBodies = []; // Clear bodies? Or do they persist? Usually cleared or this is a new round.
     // If it's a new round, usually bodies are cleaned up in Among Us.
 
@@ -213,7 +214,7 @@ export class GameState {
         this.roundTimer -= 1;
 
         // Prompt AI agents for actions every 5 seconds
-        if (this.roundTimer % 5 === 0 || this.roundTimer === 300) {
+        if (this.roundTimer % 5 === 0 || this.roundTimer === this.ROUND_DURATION_SECONDS) {
           this.promptAgents();
         }
 

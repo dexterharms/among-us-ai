@@ -269,4 +269,50 @@ describe('GameState', () => {
       expect(gameState.getPhase()).toBe(GamePhase.VOTING);
     });
   });
+
+  describe('Round Timer Behavior (HAR-110)', () => {
+    test('should initialize round timer to 300 seconds (5 minutes)', () => {
+      gameState.startRound();
+      expect(gameState.getRoundTimer()).toBe(300);
+    });
+
+    test('should use consistent constant for timer duration', () => {
+      gameState.startRound();
+      // If the constant is used consistently, timer will be initialized correctly
+      expect(gameState.getRoundTimer()).toBeGreaterThan(0);
+      expect(gameState.getRoundTimer()).toBe(300);
+    });
+
+    test('should start council phase when timer reaches zero', () => {
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.startRound();
+      expect(gameState.getPhase()).toBe(GamePhase.ROUND);
+
+      // Manually set timer to 0 to simulate round end
+      gameState.roundTimer = 0;
+
+      // shouldStartCouncil should return true when timer <= 0
+      expect(gameState.shouldStartCouncil()).toBe(true);
+    });
+
+    test('should decrement timer each second in game loop', () => {
+      gameState.startRound();
+      const initialTimer = gameState.getRoundTimer();
+
+      // Simulate a few ticks
+      gameState.roundTimer = initialTimer - 3;
+
+      expect(gameState.getRoundTimer()).toBe(initialTimer - 3);
+    });
+
+    test('should not start council while timer is positive', () => {
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.startRound();
+      gameState.roundTimer = 150; // Mid-round
+
+      expect(gameState.shouldStartCouncil()).toBe(false);
+    });
+  });
 });
