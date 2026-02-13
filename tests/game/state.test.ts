@@ -140,7 +140,7 @@ describe('GameState', () => {
 
       expect(gameState.getRoundNumber()).toBe(initialRound + 1);
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
-      expect(gameState.getRoundTimer()).toBe(30);
+      expect(gameState.getRoundTimer()).toBe(300); // 5 minutes (300 seconds) per HAR-110
     });
 
     test('should start multiple rounds and increment each time', () => {

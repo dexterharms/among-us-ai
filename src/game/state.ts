@@ -94,7 +94,7 @@ export class GameState {
     const previousPhase = this.phase;
     this.phase = GamePhase.ROUND;
     this.roundNumber += 1;
-    this.roundTimer = 30; // 30 seconds per round? Or implied from prompt '30s interval'
+    this.roundTimer = 300; // 5 minutes (300 seconds) per round per HAR-110
     this.deadBodies = []; // Clear bodies? Or do they persist? Usually cleared or this is a new round.
     // If it's a new round, usually bodies are cleaned up in Among Us.
 
@@ -213,7 +213,7 @@ export class GameState {
         this.roundTimer -= 1;
 
         // Prompt AI agents for actions every 5 seconds
-        if (this.roundTimer % 5 === 0 || this.roundTimer === 30) {
+        if (this.roundTimer % 5 === 0 || this.roundTimer === 300) {
           this.promptAgents();
         }
 
