@@ -60,12 +60,17 @@ export class TaskManager {
   }
 
   private calculateTotalTasks(): void {
-    let count = 0;
+    // Count unique task IDs from task definitions, not interactables in rooms
+    // This is because the same task ID may appear in multiple rooms for testing,
+    // and in the real game, each player is assigned specific tasks to complete.
+    const uniqueTaskIds = new Set<string>();
     this.gameState.rooms.forEach((room) => {
       const taskInteractables = room.interactables.filter((i) => i.type === 'Task');
-      count += taskInteractables.length;
+      taskInteractables.forEach((task) => {
+        uniqueTaskIds.add(task.id);
+      });
     });
-    this.totalTasks = count || 1;
+    this.totalTasks = uniqueTaskIds.size || 1;
   }
 
   /**

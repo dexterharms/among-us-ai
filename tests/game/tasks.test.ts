@@ -25,27 +25,38 @@ describe('TaskManager', () => {
   beforeEach(() => {
     gameState = new GameState();
 
-    // Add fake task interactables to test rooms BEFORE creating TaskManager
+    // Clear existing task interactables from all rooms, then add test tasks
     // This ensures TaskManager calculates totalTasks correctly
-    const cafeteriaRoom = gameState.rooms.get('cafeteria');
-    const electricalRoom = gameState.rooms.get('electrical');
-    const securityRoom = gameState.rooms.get('security');
+    // Use actual room IDs from ROOMS array: center, electrical-room, logs-room
+    // In Among Us, each crewmate has their own tasks to complete. For testing,
+    // we add all 3 tasks to each room so any player in any room can complete
+    // their assigned tasks. This simulates the real game where tasks are
+    // assigned to specific players, not locations.
+    const rooms = ['center', 'electrical-room', 'logs-room'];
 
-    if (cafeteriaRoom) {
-      cafeteriaRoom.interactables.push(
-        { id: 'task-1', type: 'Task', name: 'Test Task 1', action: 'Complete' }
-      );
-    }
-    if (electricalRoom) {
-      electricalRoom.interactables.push(
-        { id: 'task-2', type: 'Task', name: 'Test Task 2', action: 'Complete' }
-      );
-    }
-    if (securityRoom) {
-      securityRoom.interactables.push(
-        { id: 'task-3', type: 'Task', name: 'Test Task 3', action: 'Complete' }
-      );
-    }
+    // Clear existing tasks
+    rooms.forEach(roomId => {
+      const room = gameState.rooms.get(roomId);
+      if (room) {
+        room.interactables = room.interactables.filter((i) => i.type !== 'Task');
+      }
+    });
+
+    // Add test tasks to each room
+    const allTasks = [
+      { id: 'task-1', type: 'Task', name: 'Test Task 1', action: 'Complete' },
+      { id: 'task-2', type: 'Task', name: 'Test Task 2', action: 'Complete' },
+      { id: 'task-3', type: 'Task', name: 'Test Task 3', action: 'Complete' },
+    ];
+
+    rooms.forEach(roomId => {
+      const room = gameState.rooms.get(roomId);
+      if (room) {
+        allTasks.forEach(task => {
+          room.interactables.push(task);
+        });
+      }
+    });
 
     // Create players: 1 imposter, 3 crewmates
     imposter = createMockPlayer({
@@ -53,7 +64,7 @@ describe('TaskManager', () => {
       name: 'The Imposter',
       role: PlayerRole.IMPOSTER,
       status: PlayerStatus.ALIVE,
-      location: { roomId: 'cafeteria', x: 0, y: 0 },
+      location: { roomId: 'center', x: 0, y: 0 },
     });
 
     crewmates = [
@@ -62,7 +73,7 @@ describe('TaskManager', () => {
         name: 'Crewmate 1',
         role: PlayerRole.CREWMATE,
         status: PlayerStatus.ALIVE,
-        location: { roomId: 'cafeteria', x: 10, y: 10 },
+        location: { roomId: 'center', x: 10, y: 10 },
         tasks: [],
         taskProgress: 0,
       }),
@@ -71,7 +82,7 @@ describe('TaskManager', () => {
         name: 'Crewmate 2',
         role: PlayerRole.CREWMATE,
         status: PlayerStatus.ALIVE,
-        location: { roomId: 'electrical', x: 20, y: 20 },
+        location: { roomId: 'electrical-room', x: 20, y: 20 },
         tasks: [],
         taskProgress: 0,
       }),
@@ -80,7 +91,7 @@ describe('TaskManager', () => {
         name: 'Crewmate 3',
         role: PlayerRole.CREWMATE,
         status: PlayerStatus.ALIVE,
-        location: { roomId: 'security', x: 30, y: 30 },
+        location: { roomId: 'logs-room', x: 30, y: 30 },
         tasks: [],
         taskProgress: 0,
       }),
