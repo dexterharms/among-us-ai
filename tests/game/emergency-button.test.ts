@@ -133,4 +133,41 @@ describe('EmergencyButtonSystem', () => {
       expect(true).toBe(true);
     });
   });
+
+  describe('sabotage blocking', () => {
+    test('returns false during active sabotage', () => {
+      // Add an imposter to trigger sabotage
+      gameState.addPlayer({
+        id: 'imposter',
+        name: 'Imposter',
+        role: PlayerRole.IMPOSTER,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'council-room', x: -2, y: 0 },
+        emergencyMeetingsUsed: 0,
+      });
+
+      // Add a crewmate who will try to call emergency
+      gameState.addPlayer({
+        id: 'p1',
+        name: 'Player',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'council-room', x: -2, y: 0 },
+        emergencyMeetingsUsed: 0,
+      });
+
+      // Set game phase to ROUND (required for sabotage)
+      gameState.phase = 'Round';
+
+      // Trigger a sabotage (by the imposter)
+      const sabotageSystem = gameState.getSabotageSystem();
+      const sabotageResult = sabotageSystem.triggerSabotage('imposter', { type: 'lights' });
+      expect(sabotageResult.success).toBe(true);
+
+      const roundStart = Date.now() - 30000;
+      const result = system.canCallEmergency('p1', 'council-room', roundStart);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('sabotage');
+    });
+  });
 });

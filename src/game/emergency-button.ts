@@ -48,6 +48,12 @@ export class EmergencyButtonSystem {
       return { valid: false, reason: 'You have already used your emergency meeting' };
     }
 
+    // Check for active sabotage
+    const sabotageSystem = this.gameState.getSabotageSystem();
+    if (sabotageSystem.isSabotageActive()) {
+      return { valid: false, reason: 'Cannot call emergency meeting during active sabotage' };
+    }
+
     return { valid: true };
   }
 
