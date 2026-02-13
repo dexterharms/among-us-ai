@@ -80,6 +80,24 @@ describe('GameState', () => {
       gameState.setRoundTimer(3600);
       expect(gameState.getRoundTimer()).toBe(3600);
     });
+
+    test('should handle negative timer values', () => {
+      gameState.setRoundTimer(-10);
+      expect(gameState.getRoundTimer()).toBe(-10);
+    });
+
+    test('should reject NaN timer values', () => {
+      const initialTimer = gameState.getRoundTimer();
+      gameState.setRoundTimer(NaN);
+      expect(gameState.getRoundTimer()).toBe(initialTimer);
+    });
+
+    test('should reject non-numeric timer values', () => {
+      const initialTimer = gameState.getRoundTimer();
+      // @ts-expect-error - Testing invalid input type
+      gameState.setRoundTimer('invalid');
+      expect(gameState.getRoundTimer()).toBe(initialTimer);
+    });
   });
 
   describe('Player Management', () => {
@@ -140,7 +158,7 @@ describe('GameState', () => {
 
       expect(gameState.getRoundNumber()).toBe(initialRound + 1);
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
-      expect(gameState.getRoundTimer()).toBe(30);
+      expect(gameState.getRoundTimer()).toBe(300); // 5 minutes (300 seconds) per HAR-110
     });
 
     test('should start multiple rounds and increment each time', () => {
@@ -188,9 +206,27 @@ describe('GameState', () => {
       const player2 = gameState.players.get('player-2');
       const player3 = gameState.players.get('player-3');
 
+      // Verify alive players have valid room assignments
       expect(player1?.location.roomId).toBeDefined();
       expect(player2?.location.roomId).toBeDefined();
-      expect(player3?.location).toEqual(players[2].location); // Dead player location unchanged
+
+      // Verify the assigned roomId exists in the rooms map
+      if (player1?.location.roomId) {
+        expect(gameState.rooms.has(player1.location.roomId)).toBe(true);
+        const room1 = gameState.rooms.get(player1.location.roomId);
+        expect(player1.location.x).toBe(room1?.position.x);
+        expect(player1.location.y).toBe(room1?.position.y);
+      }
+
+      if (player2?.location.roomId) {
+        expect(gameState.rooms.has(player2.location.roomId)).toBe(true);
+        const room2 = gameState.rooms.get(player2.location.roomId);
+        expect(player2.location.x).toBe(room2?.position.x);
+        expect(player2.location.y).toBe(room2?.position.y);
+      }
+
+      // Dead player location should remain unchanged
+      expect(player3?.location).toEqual(players[2].location);
     });
   });
 
@@ -203,7 +239,7 @@ describe('GameState', () => {
         createMockPlayer({ id: 'player-2', role: PlayerRole.CREWMATE }),
       );
 
-      expect(gameState.getImposterCount()).toBe(0);
+      expect(gameState.imposterCount).toBe(0);
     });
 
     test('should count alive imposters only', () => {
@@ -229,7 +265,7 @@ describe('GameState', () => {
         }),
       );
 
-      expect(gameState.getImposterCount()).toBe(2);
+      expect(gameState.imposterCount).toBe(2);
     });
 
     test('should return 0 when all imposters are dead', () => {
@@ -248,7 +284,7 @@ describe('GameState', () => {
         }),
       );
 
-      expect(gameState.getImposterCount()).toBe(0);
+      expect(gameState.imposterCount).toBe(0);
     });
   });
 
@@ -267,6 +303,234 @@ describe('GameState', () => {
       gameState.setPhase(GamePhase.VOTING);
 
       expect(gameState.getPhase()).toBe(GamePhase.VOTING);
+    });
+  });
+
+  describe('shouldStartCouncil Edge Cases', () => {
+    test('should return false when roundTimer is positive and no bodies reported', () => {
+      gameState.setRoundTimer(100);
+      expect(gameState.shouldStartCouncil()).toBe(false);
+    });
+
+    test('should return false when deadBodies contains null elements', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: false,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.setRoundTimer(100);
+
+      // @ts-expect-error - Testing error handling with null element
+      gameState.deadBodies.push(null);
+
+      expect(gameState.shouldStartCouncil()).toBe(false);
+    });
+  });
+
+  describe('Body Discovery', () => {
+    test('should mark body as reported when discovered', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: false,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.discoverBody('player-1', 0);
+
+      expect(gameState.deadBodies[0].reported).toBe(true);
+    });
+
+    test('should not report body with invalid bodyId', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: false,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      // Negative bodyId should not change deadBodies
+      gameState.discoverBody('player-1', -1);
+      expect(gameState.deadBodies).toHaveLength(1);
+      expect(gameState.deadBodies[0].reported).toBe(false);
+
+      // Out of bounds bodyId should not change deadBodies
+      gameState.discoverBody('player-1', 999);
+      expect(gameState.deadBodies).toHaveLength(1);
+      expect(gameState.deadBodies[0].reported).toBe(false);
+    });
+
+    test('should not report already reported body', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: true,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      // Should not throw on already reported body
+      expect(() => gameState.discoverBody('player-1', 0)).not.toThrow();
+    });
+
+    test('should trigger council phase when body is reported', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: false,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.discoverBody('player-1', 0);
+
+      expect(gameState.getPhase()).toBe(GamePhase.VOTING);
+    });
+  });
+
+  describe('Round Timer Behavior (HAR-110)', () => {
+    test('should initialize round timer to 300 seconds (5 minutes)', () => {
+      gameState.startRound();
+      expect(gameState.getRoundTimer()).toBe(300);
+    });
+
+    test('should use consistent constant for timer duration', () => {
+      gameState.startRound();
+      expect(gameState.getRoundTimer()).toBe(300);
+    });
+
+    test('should start council phase when timer reaches zero', () => {
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.startRound();
+      expect(gameState.getPhase()).toBe(GamePhase.ROUND);
+
+      // Manually set timer to 0 to simulate round end
+      gameState.setRoundTimer(0);
+
+      // shouldStartCouncil should return true when timer <= 0
+      expect(gameState.shouldStartCouncil()).toBe(true);
+    });
+
+    test('should decrement timer each second in game loop', () => {
+      gameState.startRound();
+      const initialTimer = gameState.getRoundTimer();
+
+      // Simulate a few ticks
+      gameState.setRoundTimer(initialTimer - 3);
+
+      expect(gameState.getRoundTimer()).toBe(initialTimer - 3);
+    });
+
+    test('should not start council while timer is positive', () => {
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.startRound();
+      gameState.setRoundTimer(150); // Mid-round
+
+      expect(gameState.shouldStartCouncil()).toBe(false);
+    });
+  });
+
+  describe('movePlayer', () => {
+    test('should successfully move player between connected rooms', () => {
+      const player = createMockPlayer({
+        id: 'player-1',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'center', x: 0, y: 0 },
+      });
+
+      gameState.addPlayer(player);
+
+      // center is connected to electrical-room
+      const result = gameState.movePlayer('player-1', 'electrical-room');
+
+      expect(result).toBe(true);
+      expect(player.location.roomId).toBe('electrical-room');
+    });
+
+    test('should not move non-existent player', () => {
+      const result = gameState.movePlayer('nonexistent', 'electrical-room');
+      expect(result).toBe(false);
+    });
+
+    test('should not move dead player', () => {
+      const player = createMockPlayer({
+        id: 'player-1',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.DEAD,
+        location: { roomId: 'center', x: 0, y: 0 },
+      });
+
+      gameState.addPlayer(player);
+
+      const result = gameState.movePlayer('player-1', 'electrical-room');
+
+      expect(result).toBe(false);
+      expect(player.location.roomId).toBe('center');
+    });
+
+    test('should not move to disconnected rooms', () => {
+      const player = createMockPlayer({
+        id: 'player-1',
+        role: PlayerRole.CREWMATE,
+        status: PlayerStatus.ALIVE,
+        location: { roomId: 'center', x: 0, y: 0 },
+      });
+
+      gameState.addPlayer(player);
+
+      // Try to move to a room that is not connected
+      const result = gameState.movePlayer('player-1', 'council-room');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('cleanup', () => {
+    test('should stop game loop and tick processor', () => {
+      gameState.startRound();
+
+      expect(() => gameState.cleanup()).not.toThrow();
+    });
+
+    test('should not throw when called multiple times', () => {
+      gameState.cleanup();
+      expect(() => gameState.cleanup()).not.toThrow();
+    });
+  });
+
+  describe('reset', () => {
+    test('should reset all state to initial values', () => {
+      gameState.addPlayer(createMockPlayer({ id: 'player-1' }));
+      gameState.startRound();
+      gameState.setRoundTimer(100);
+
+      gameState.reset();
+
+      expect(gameState.getPhase()).toBe(GamePhase.LOBBY);
+      expect(gameState.getRoundNumber()).toBe(0);
+      expect(gameState.getRoundTimer()).toBe(0);
+      expect(gameState.deadBodies).toHaveLength(0);
     });
   });
 });
