@@ -20,12 +20,27 @@ import { SabotageSystem } from './sabotage';
 import { MinigameManager } from '@/tasks';
 
 export class GameState {
-  phase: GamePhase = GamePhase.LOBBY;
-  roundNumber: number = 0;
-  roundTimer: number = 0;
-  players: Map<string, Player> = new Map();
-  rooms: Map<string, Room> = new Map();
-  deadBodies: Array<DeadBody> = [];
+  private phase: GamePhase = GamePhase.LOBBY;
+  private roundNumber: number = 0;
+  private roundTimer: number = 0;
+
+  // Private backing fields for readonly public access
+  private _players: Map<string, Player> = new Map();
+  private _rooms: Map<string, Room> = new Map();
+  private _deadBodies: Array<DeadBody> = [];
+
+  // Readonly public access to critical state
+  get players(): Map<string, Player> {
+    return this._players;
+  }
+
+  get rooms(): Map<string, Room> {
+    return this._rooms;
+  }
+
+  get deadBodies(): Array<DeadBody> {
+    return this._deadBodies;
+  }
 
   private readonly ROUND_DURATION_SECONDS = 300; // 5 minutes per round per HAR-110
   private roomManager: RoomManager;
@@ -50,7 +65,7 @@ export class GameState {
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
-      this.rooms.set(room.id, room);
+      this._rooms.set(room.id, room);
     });
   }
 
@@ -101,12 +116,12 @@ export class GameState {
     this.roundNumber += 1;
     this.roundTimer = this.ROUND_DURATION_SECONDS;
     // Clear dead bodies at the start of each round
-    this.deadBodies = [];
+    this._deadBodies = [];
 
     logger.logStateTransition(previousPhase, GamePhase.ROUND, {
       roundNumber: this.roundNumber,
-      playerCount: this.players.size,
-      imposterCount: this.getImposterCount(),
+      playerCount: this._players.size,
+      imposterCount: this.imposterCount,
     });
 
     this.spawnPlayersInRandomRooms();
@@ -116,7 +131,7 @@ export class GameState {
       type: EventType.ROUND_STARTED,
       payload: {
         roundNumber: this.roundNumber,
-        imposterCount: this.getImposterCount(),
+        imposterCount: this.imposterCount,
       },
     };
     this.logAndBroadcast(event);
@@ -133,14 +148,14 @@ export class GameState {
       if (!rooms || rooms.length === 0) {
         logger.error('No rooms available for spawning players', {
           roomCount: rooms?.length || 0,
-          playerCount: this.players.size,
+          playerCount: this._players.size,
         });
         return;
       }
 
       let spawnedCount = 0;
 
-      this.players.forEach((player, playerId) => {
+      this._players.forEach((player, playerId) => {
         try {
           // Guard against null/undefined player
           if (!player) {
@@ -167,7 +182,6 @@ export class GameState {
               y: randomRoom.position.y,
             };
             spawnedCount++;
-            // Update player in map? It's a reference, so yes.
           }
         } catch (error) {
           logger.error(`Error spawning player ${playerId}`, {
@@ -312,13 +326,13 @@ export class GameState {
       if (this.roundTimer <= 0) return true;
 
       // Guard against undefined or null deadBodies array
-      if (!this.deadBodies || !Array.isArray(this.deadBodies)) {
+      if (!this._deadBodies || !Array.isArray(this._deadBodies)) {
         logger.warn('Invalid deadBodies array in shouldStartCouncil');
         return false;
       }
 
       // Check if any dead bodies have been reported with null checks
-      return this.deadBodies.some((body) => {
+      return this._deadBodies.some((body) => {
         if (!body) return false;
         return body.reported === true;
       });
@@ -336,21 +350,21 @@ export class GameState {
   discoverBody(playerId: string, bodyId: number): void {
     try {
       // Guard against invalid deadBodies array
-      if (!this.deadBodies || !Array.isArray(this.deadBodies)) {
+      if (!this._deadBodies || !Array.isArray(this._deadBodies)) {
         logger.error('Invalid deadBodies array in discoverBody', {
-          deadBodies: this.deadBodies,
+          deadBodies: this._deadBodies,
           playerId,
           bodyId,
         });
         return;
       }
 
-      if (bodyId < 0 || bodyId >= this.deadBodies.length) {
-        logger.warn('Invalid body ID', { playerId, bodyId, totalBodies: this.deadBodies.length });
+      if (bodyId < 0 || bodyId >= this._deadBodies.length) {
+        logger.warn('Invalid body ID', { playerId, bodyId, totalBodies: this._deadBodies.length });
         return;
       }
 
-      const body = this.deadBodies[bodyId];
+      const body = this._deadBodies[bodyId];
       if (!body || body.reported) {
         logger.warn('Body already reported or not found', { playerId, bodyId });
         return;
@@ -359,7 +373,7 @@ export class GameState {
       // Mark body as reported
       body.reported = true;
 
-      const reporter = this.players.get(playerId);
+      const reporter = this._players.get(playerId);
 
       // Broadcast body found event - guard against missing location
       if (!body.location) {
@@ -405,17 +419,20 @@ export class GameState {
     this.tickProcessor.stop();
 
     // Delegate to VotingSystem
-    this.votingSystem.startCouncil(this.deadBodies);
+    this.votingSystem.startCouncil(this._deadBodies);
   }
 
-  // Helper
-  getImposterCount(): number {
+  /**
+   * Get the count of alive imposters
+   * Property getter for computed read-only value
+   */
+  get imposterCount(): number {
     let count = 0;
     try {
-      this.players.forEach((p, playerId) => {
+      this._players.forEach((p, playerId) => {
         // Guard against null/undefined player
         if (!p) {
-          logger.warn(`Null/undefined player in getImposterCount: ${playerId}`);
+          logger.warn(`Null/undefined player in imposterCount getter: ${playerId}`);
           return;
         }
 
@@ -424,18 +441,11 @@ export class GameState {
         }
       });
     } catch (error) {
-      logger.error('Error in getImposterCount', {
+      logger.error('Error in imposterCount getter', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
     return count;
-  }
-
-  /**
-   * Getter for serialization (satisfies GameStateSchema.imposterCount)
-   */
-  get imposterCount(): number {
-    return this.getImposterCount();
   }
 
   /**
@@ -445,7 +455,7 @@ export class GameState {
    * @returns true if move was successful, false otherwise
    */
   movePlayer(playerId: string, targetRoomId: string): boolean {
-    const player = this.players.get(playerId);
+    const player = this._players.get(playerId);
     if (!player) {
       logger.warn('Cannot move: player not found', { playerId });
       return false;
@@ -506,7 +516,7 @@ export class GameState {
 
   // Add player helper for testing/usage
   addPlayer(player: Player): void {
-    this.players.set(player.id, player);
+    this._players.set(player.id, player);
     logger.debug('Player added to game state', {
       playerId: player.id,
       playerName: player.name,
@@ -554,13 +564,13 @@ export class GameState {
     logger.info('Resetting game state', {
       previousPhase: this.phase,
       roundNumber: this.roundNumber,
-      playerCount: this.players.size,
+      playerCount: this._players.size,
     });
 
     this.phase = GamePhase.LOBBY;
     this.roundNumber = 0;
     this.roundTimer = 0;
-    this.deadBodies = [];
+    this._deadBodies = [];
     this.stopGameLoop();
     this.tickProcessor.reset();
     this.sabotageSystem.reset();
