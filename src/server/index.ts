@@ -15,7 +15,6 @@ export class GameServer {
   private gameState: GameState;
   private lobbyManager: LobbyManager;
   private gameCoordinator: GameCoordinator;
-  private taskManager: TaskManager;
   private port: number;
   private hostname: string;
 
@@ -29,7 +28,13 @@ export class GameServer {
       this.gameState,
       this.gameState.getSSEManager(),
     );
-    this.taskManager = new TaskManager(this.gameState, this.gameState.getSSEManager());
+  }
+
+  /**
+   * Get the task manager from game state
+   */
+  private get taskManager(): TaskManager {
+    return this.gameState.getTaskManager();
   }
 
   /**
@@ -312,7 +317,61 @@ export class GameServer {
           }
         }
 
-        // API: Attempt task
+        // API: Start a task (initialize minigame)
+        if (url.pathname === '/api/game/task/start' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, taskId } = body as { playerId: string; taskId: string };
+
+            if (!playerId || !taskId) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, taskId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const result = this.taskManager.startTask(playerId, taskId);
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error starting task:', err);
+            return Response.json(
+              { error: 'Failed to start task' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Submit task action (HAR-94 - minigame validation)
+        if (url.pathname === '/api/game/action' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, taskId, action } = body as {
+              playerId: string;
+              taskId: string;
+              action: any;
+            };
+
+            if (!playerId || !taskId || action === undefined) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, taskId, action' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const result = this.taskManager.submitTaskAction(playerId, taskId, action);
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error submitting task action:', err);
+            return Response.json(
+              { error: 'Failed to submit task action' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Attempt task (legacy - for backward compatibility)
         if (url.pathname === '/api/game/task' && req.method === 'POST') {
           try {
             const body = await req.json();

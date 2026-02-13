@@ -2,11 +2,20 @@ import { z } from 'zod';
 
 export enum TaskType {
   SHORT = 'Short',
+  MEDIUM = 'Medium',
   LONG = 'Long',
 }
 
 export enum MinigameType {
-  COUNTER = 'counter',
+  SEQUENCE_REPETITION = 'sequence-repetition',
+  WORD_MATH = 'word-math',
+  SLIDING_TILE = 'sliding-tile',
+  BATTLESHIP = 'battleship',
+  HOT_COLD = 'hot-cold',
+  HOLD_BUTTON = 'hold-button',
+  CODE_BREAKER = 'code-breaker',
+  TRANSFER_FUEL = 'transfer-fuel',
+  COUNTER = 'counter', // Legacy, kept for compatibility
 }
 
 export const TaskTypeSchema = z.nativeEnum(TaskType);

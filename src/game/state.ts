@@ -15,6 +15,7 @@ import { SSEManager } from '@/sse/manager';
 import { VotingSystem } from './voting';
 import { TickProcessor } from '@/tick';
 import { PlayerState } from '@/tick/state-machine';
+import { TaskManager } from './tasks';
 import { SabotageSystem } from './sabotage';
 
 export class GameState {
@@ -31,6 +32,7 @@ export class GameState {
   private sseManager: SSEManager;
   private votingSystem: VotingSystem;
   private tickProcessor: TickProcessor;
+  private taskManager: TaskManager;
   private sabotageSystem: SabotageSystem;
 
   constructor() {
@@ -39,6 +41,7 @@ export class GameState {
     this.sseManager = new SSEManager();
     this.votingSystem = new VotingSystem(this, this.sseManager);
     this.tickProcessor = new TickProcessor(this, this.sseManager);
+    this.taskManager = new TaskManager(this, this.sseManager);
     this.sabotageSystem = new SabotageSystem(this, this.sseManager);
 
     // Initialize rooms from RoomManager
@@ -540,6 +543,13 @@ export class GameState {
    */
   getTickProcessor(): TickProcessor {
     return this.tickProcessor;
+  }
+
+  /**
+   * Get task manager for task assignment and completion
+   */
+  getTaskManager(): TaskManager {
+    return this.taskManager;
   }
 
   // Reset game state for starting a fresh game
