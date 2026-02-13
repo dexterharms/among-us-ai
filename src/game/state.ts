@@ -287,6 +287,7 @@ export class GameState {
     this.stopGameLoop();
     this.tickProcessor.stop();
     this.votingSystem.cleanup();
+    this.sabotageSystem.cleanup();
   }
 
   /**
@@ -294,6 +295,13 @@ export class GameState {
    */
   getVotingSystem(): VotingSystem {
     return this.votingSystem;
+  }
+
+  /**
+   * Get the sabotage system
+   */
+  getSabotageSystem(): SabotageSystem {
+    return this.sabotageSystem;
   }
 
   shouldStartCouncil(): boolean {
@@ -455,6 +463,16 @@ export class GameState {
     }
 
     const currentRoomId = player.location.roomId;
+
+    // Check if movement is blocked by doors sabotage
+    if (this.sabotageSystem.isMovementBlocked(targetRoomId)) {
+      logger.warn('Movement blocked by doors sabotage', {
+        playerId,
+        currentRoomId,
+        targetRoomId,
+      });
+      return false;
+    }
 
     // Validate the movement (check if rooms are connected)
     if (!this.roomManager.validateMovement(currentRoomId, targetRoomId)) {

@@ -3,6 +3,7 @@ import { ActionQueue, QueuedAction } from './queue';
 import { PlayerStateMachine, PlayerState } from './state-machine';
 import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
+import { SabotageSystem, SabotageType } from '@/game/sabotage';
 
 /**
  * Tick configuration constants

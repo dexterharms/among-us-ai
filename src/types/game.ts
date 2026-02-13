@@ -229,6 +229,28 @@ export const TaskFailedPayload = z.object({
   reason: z.string(),
 });
 
+// Sabotage Event Payloads
+export const SabotageActivatedPayload = z.object({
+  sabotageId: z.string(),
+  type: z.enum(['lights', 'doors', 'self-destruct']),
+  target: z.string().optional(),
+  message: z.string(),
+  timer: z.number().optional(),
+});
+export const SabotageUpdatedPayload = z.object({
+  sabotageId: z.string(),
+  type: z.enum(['lights', 'doors', 'self-destruct']),
+  message: z.string(),
+  timer: z.number().optional(),
+  remainingSeconds: z.number().optional(),
+});
+export const SabotageResolvedPayload = z.object({
+  sabotageId: z.string(),
+  type: z.enum(['lights', 'doors', 'self-destruct']),
+  reason: z.string(),
+  success: z.boolean(),
+});
+
 // Event Schemas
 export const PlayerJoinedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.PLAYER_JOINED),
@@ -310,6 +332,18 @@ export const TaskFailedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.TASK_FAILED),
   payload: TaskFailedPayload,
 });
+export const SabotageActivatedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_ACTIVATED),
+  payload: SabotageActivatedPayload,
+});
+export const SabotageUpdatedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_UPDATED),
+  payload: SabotageUpdatedPayload,
+});
+export const SabotageResolvedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.SABOTAGE_RESOLVED),
+  payload: SabotageResolvedPayload,
+});
 
 // Lobby Event Schemas
 export const PlayerJoinedLobbyEventSchema = BaseEventSchema.extend({
@@ -366,5 +400,8 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   YouDiedEventSchema,
   TaskCompletedEventSchema,
   TaskFailedEventSchema,
+  SabotageActivatedEventSchema,
+  SabotageUpdatedEventSchema,
+  SabotageResolvedEventSchema,
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;
