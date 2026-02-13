@@ -72,6 +72,10 @@ export class GameState {
   }
 
   setRoundTimer(time: number): void {
+    if (typeof time !== 'number' || isNaN(time)) {
+      logger.error('Invalid round timer value', { time });
+      return;
+    }
     this.roundTimer = time;
   }
 
@@ -96,8 +100,8 @@ export class GameState {
     this.phase = GamePhase.ROUND;
     this.roundNumber += 1;
     this.roundTimer = this.ROUND_DURATION_SECONDS;
-    this.deadBodies = []; // Clear bodies? Or do they persist? Usually cleared or this is a new round.
-    // If it's a new round, usually bodies are cleaned up in Among Us.
+    // Clear dead bodies at the start of each round
+    this.deadBodies = [];
 
     logger.logStateTransition(previousPhase, GamePhase.ROUND, {
       roundNumber: this.roundNumber,
@@ -301,7 +305,7 @@ export class GameState {
     try {
       // Guard against invalid timer values
       if (typeof this.roundTimer !== 'number' || isNaN(this.roundTimer)) {
-        console.warn('[GameState] Invalid roundTimer in shouldStartCouncil:', this.roundTimer);
+        logger.warn('Invalid roundTimer in shouldStartCouncil:', this.roundTimer);
         return false;
       }
 
@@ -309,7 +313,7 @@ export class GameState {
 
       // Guard against undefined or null deadBodies array
       if (!this.deadBodies || !Array.isArray(this.deadBodies)) {
-        console.warn('[GameState] Invalid deadBodies array in shouldStartCouncil');
+        logger.warn('Invalid deadBodies array in shouldStartCouncil');
         return false;
       }
 
@@ -319,7 +323,7 @@ export class GameState {
         return body.reported === true;
       });
     } catch (error) {
-      console.error('[GameState] Error in shouldStartCouncil:', error);
+      logger.error('Error in shouldStartCouncil:', error);
       return false; // Default to not starting council on error
     }
   }

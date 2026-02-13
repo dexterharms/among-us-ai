@@ -80,6 +80,11 @@ describe('GameState', () => {
       gameState.setRoundTimer(3600);
       expect(gameState.getRoundTimer()).toBe(3600);
     });
+
+    test('should handle negative timer values', () => {
+      gameState.setRoundTimer(-10);
+      expect(gameState.getRoundTimer()).toBe(-10);
+    });
   });
 
   describe('Player Management', () => {
@@ -270,6 +275,66 @@ describe('GameState', () => {
     });
   });
 
+  describe('Body Discovery', () => {
+    test('should mark body as reported when discovered', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: false,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.discoverBody('player-1', 0);
+
+      expect(gameState.deadBodies[0].reported).toBe(true);
+    });
+
+    test('should not report body with invalid bodyId', () => {
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      // Should not throw on invalid bodyId
+      expect(() => gameState.discoverBody('player-1', -1)).not.toThrow();
+      expect(() => gameState.discoverBody('player-1', 999)).not.toThrow();
+    });
+
+    test('should not report already reported body', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: true,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      // Should not throw on already reported body
+      expect(() => gameState.discoverBody('player-1', 0)).not.toThrow();
+    });
+
+    test('should trigger council phase when body is reported', () => {
+      const deadBody: DeadBody = {
+        playerId: 'victim-1',
+        role: PlayerRole.CREWMATE,
+        location: { roomId: 'center', x: 0, y: 0 },
+        reported: false,
+        roomId: 'center',
+      };
+
+      gameState.deadBodies.push(deadBody);
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+
+      gameState.discoverBody('player-1', 0);
+
+      expect(gameState.getPhase()).toBe(GamePhase.VOTING);
+    });
+  });
+
   describe('Round Timer Behavior (HAR-110)', () => {
     test('should initialize round timer to 300 seconds (5 minutes)', () => {
       gameState.startRound();
@@ -278,8 +343,6 @@ describe('GameState', () => {
 
     test('should use consistent constant for timer duration', () => {
       gameState.startRound();
-      // If the constant is used consistently, timer will be initialized correctly
-      expect(gameState.getRoundTimer()).toBeGreaterThan(0);
       expect(gameState.getRoundTimer()).toBe(300);
     });
 
@@ -290,7 +353,7 @@ describe('GameState', () => {
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
 
       // Manually set timer to 0 to simulate round end
-      gameState.roundTimer = 0;
+      gameState.setRoundTimer(0);
 
       // shouldStartCouncil should return true when timer <= 0
       expect(gameState.shouldStartCouncil()).toBe(true);
@@ -301,7 +364,7 @@ describe('GameState', () => {
       const initialTimer = gameState.getRoundTimer();
 
       // Simulate a few ticks
-      gameState.roundTimer = initialTimer - 3;
+      gameState.setRoundTimer(initialTimer - 3);
 
       expect(gameState.getRoundTimer()).toBe(initialTimer - 3);
     });
@@ -310,7 +373,7 @@ describe('GameState', () => {
       gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
 
       gameState.startRound();
-      gameState.roundTimer = 150; // Mid-round
+      gameState.setRoundTimer(150); // Mid-round
 
       expect(gameState.shouldStartCouncil()).toBe(false);
     });
