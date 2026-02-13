@@ -369,8 +369,22 @@ export class TickProcessor {
 
   private handleTask(playerId: string, payload: any): void {
     // Delegate to TaskManager
-    // For now, just log
-    logger.debug('Task action queued', { playerId, payload });
+    const taskManager = this.gameState.getTaskManager();
+
+    if (payload.action === 'start') {
+      const result = taskManager.startTask(playerId, payload.taskId);
+      if (!result.success) {
+        logger.warn('Task start failed', { playerId, taskId: payload.taskId, reason: result.reason });
+      }
+    } else if (payload.action === 'submit') {
+      const result = taskManager.submitTaskAction(playerId, payload.taskId, payload);
+      if (!result.success) {
+        logger.warn('Task action failed', { playerId, taskId: payload.taskId, reason: result.reason });
+      }
+    } else if (payload.action === 'quit') {
+      // Task quit - player abandoned the task
+      logger.debug('Player quit task', { playerId, taskId: payload.taskId });
+    }
   }
 
   private handleKill(playerId: string, payload: any): void {
@@ -386,19 +400,10 @@ export class TickProcessor {
   private handleSabotage(playerId: string, payload: any): void {
     // Delegate to SabotageSystem
     const sabotageSystem = this.gameState.getSabotageSystem();
-    const { type, target } = payload;
-
-    // Validate sabotage type
-    if (!type || !Object.values(SabotageType).includes(type)) {
-      logger.warn('Invalid sabotage type', { playerId, type });
-      return;
-    }
-
-    // Attempt sabotage
-    const result = sabotageSystem.attemptSabotage(playerId, type as SabotageType, target);
+    const result = sabotageSystem.triggerSabotage(playerId, payload);
 
     if (!result.success) {
-      logger.debug('Sabotage failed', { playerId, type, reason: result.reason });
+      logger.warn('Sabotage action failed', { playerId, payload, reason: result.reason });
     }
   }
 

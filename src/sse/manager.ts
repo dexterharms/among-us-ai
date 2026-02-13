@@ -1,16 +1,20 @@
 import { createChannel, createResponse, Channel, Session } from 'better-sse';
 import { GameEvent } from '@/types/game';
+import { validateToken } from '@/utils/jwt';
+import { logger } from '@/utils/logger';
 
 /**
  * SSE Manager - Server-Sent Events for real-time game action streaming
  *
  * Broadcasts all game events to connected clients in real-time.
  * Supports per-session messaging via session ID mapping.
+ * Requires authentication via JWT token.
  */
 export class SSEManager {
   private channel: Channel;
   private sessions: Map<string, Session> = new Map();
   private playerSessions: Map<string, string> = new Map(); // playerId -> sessionId
+  private authenticatedPlayers: Map<string, string> = new Map(); // playerId -> sessionId (for validation)
 
   constructor() {
     this.channel = createChannel();
@@ -37,36 +41,61 @@ export class SSEManager {
 
   /**
    * Send an event to a specific player by playerId
+   * Only works for authenticated players. Does not broadcast on failure.
    */
   async sendTo(playerId: string, event: GameEvent): Promise<boolean> {
     const sessionId = this.playerSessions.get(playerId);
     if (sessionId) {
       return this.sendToSession(sessionId, event);
     }
-    // Fallback to broadcast if player session not found
-    this.broadcast(event);
+    // No fallback to broadcast - log warning and return false
+    logger.warn('Failed to send private event to player - session not found', {
+      playerId,
+      eventType: event.type,
+      connectedPlayers: Array.from(this.playerSessions.keys()),
+    });
     return false;
   }
 
   /**
-   * Register a player ID to a session ID for targeted messaging
-   */
-  registerPlayerSession(playerId: string, sessionId: string): void {
-    this.playerSessions.set(playerId, sessionId);
-  }
-
-  /**
-   * Unregister a player session
-   */
-  unregisterPlayerSession(playerId: string): void {
-    this.playerSessions.delete(playerId);
-  }
-
-  /**
    * Handle a new SSE connection request
+   * Requires valid JWT token in query string: ?token=xxx
    * Returns a Response object for Bun server
    */
   async handleConnection(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const token = url.searchParams.get('token');
+
+    // Require authentication token
+    if (!token) {
+      logger.warn('SSE connection rejected - no token provided', {
+        ip: req.headers.get('x-forwarded-for') || 'unknown',
+      });
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    // Validate token
+    const decoded = await validateToken(token);
+    if (!decoded) {
+      logger.warn('SSE connection rejected - invalid token', {
+        ip: req.headers.get('x-forwarded-for') || 'unknown',
+      });
+      return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    const playerId = decoded.playerId;
     const sessionId = crypto.randomUUID();
 
     return createResponse(req, (session) => {
@@ -74,21 +103,40 @@ export class SSEManager {
       this.sessions.set(sessionId, session);
       this.channel.register(session);
 
+      // Associate session with authenticated player
+      this.playerSessions.set(playerId, sessionId);
+      this.authenticatedPlayers.set(playerId, sessionId);
+
+      logger.info('SSE connection established', {
+        playerId,
+        sessionId,
+        timestamp: Date.now(),
+      });
+
       // Send session ID to client
       session.push({ sessionId, type: 'Connected' }, 'Connected');
 
       // Cleanup on disconnect
       session.on('disconnected', () => {
         this.sessions.delete(sessionId);
-        // Also cleanup any player session mappings
-        for (const [playerId, sid] of this.playerSessions.entries()) {
-          if (sid === sessionId) {
-            this.playerSessions.delete(playerId);
-            break;
-          }
-        }
+        this.playerSessions.delete(playerId);
+        this.authenticatedPlayers.delete(playerId);
+        logger.info('SSE connection closed', {
+          playerId,
+          sessionId,
+          timestamp: Date.now(),
+        });
       });
     });
+  }
+
+  /**
+   * Check if a player has an authenticated session
+   * @param playerId - The player's unique identifier
+   * @returns True if player has an authenticated session
+   */
+  hasAuthenticatedSession(playerId: string): boolean {
+    return this.authenticatedPlayers.has(playerId);
   }
 
   /**
@@ -113,6 +161,13 @@ export class SSEManager {
   }
 
   /**
+   * Get authenticated player count
+   */
+  getAuthenticatedPlayerCount(): number {
+    return this.authenticatedPlayers.size;
+  }
+
+  /**
    * Cleanup all sessions
    */
   disconnectAll(): void {
@@ -120,5 +175,6 @@ export class SSEManager {
     // Sessions will be cleaned up when clients disconnect
     this.sessions.clear();
     this.playerSessions.clear();
+    this.authenticatedPlayers.clear();
   }
 }
