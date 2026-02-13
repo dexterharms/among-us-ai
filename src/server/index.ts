@@ -547,6 +547,34 @@ export class GameServer {
           }
         }
 
+        // API: Vent travel
+        if (url.pathname === '/api/game/vent' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, targetRoomId } = body as {
+              playerId: string;
+              targetRoomId: string;
+            };
+
+            if (!playerId || !targetRoomId) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, targetRoomId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            this.gameState.getImposterAbilities().attemptVent(playerId, targetRoomId);
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error venting:', err);
+            return Response.json(
+              { error: 'Failed to vent' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
         // 404
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       },
