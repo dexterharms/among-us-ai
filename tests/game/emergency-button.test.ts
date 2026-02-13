@@ -158,9 +158,9 @@ describe('EmergencyButtonSystem', () => {
 
   describe('reset', () => {
     test('resets internal state', () => {
-      system.reset();
-      // No state to check yet, just verify no errors
-      expect(true).toBe(true);
+      // reset() has no observable state to test
+      // Just verify it doesn't throw
+      expect(() => system.reset()).not.toThrow();
     });
   });
 
