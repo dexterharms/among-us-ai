@@ -17,6 +17,7 @@ export class GameServer {
   private gameCoordinator: GameCoordinator;
   private port: number;
   private hostname: string;
+  private server: ReturnType<typeof serve> | null = null;
 
   constructor(port: number = 3000, hostname: string = '0.0.0.0') {
     this.port = port;
@@ -425,10 +426,107 @@ export class GameServer {
           }
         }
 
+        // API: Fix sabotage
+        if (url.pathname === '/api/game/fix' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, fixType, fixData } = body as {
+              playerId: string;
+              fixType: string;
+              fixData?: any;
+            };
+
+            if (!playerId) {
+              return Response.json(
+                { error: 'Missing required field: playerId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            if (!fixType) {
+              return Response.json(
+                { error: 'Missing required field: fixType' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const player = this.gameState.players.get(playerId);
+            if (!player) {
+              return Response.json(
+                { error: 'Player not found' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const sabotageSystem = this.gameState.getSabotageSystem();
+            const result = sabotageSystem.fixSabotage(playerId, fixType, fixData);
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error fixing sabotage:', err);
+            return Response.json(
+              { error: 'Failed to fix sabotage' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Trigger sabotage
+        if (url.pathname === '/api/game/sabotage' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, sabotageType, targetRoomId } = body as {
+              playerId: string;
+              sabotageType: string;
+              targetRoomId?: string;
+            };
+
+            if (!playerId) {
+              return Response.json(
+                { error: 'Missing required field: playerId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            if (!sabotageType) {
+              return Response.json(
+                { error: 'Missing required field: sabotageType' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const player = this.gameState.players.get(playerId);
+            if (!player) {
+              return Response.json(
+                { error: 'Player not found' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const sabotageSystem = this.gameState.getSabotageSystem();
+            const result = sabotageSystem.triggerSabotage(playerId, {
+              type: sabotageType as any,
+              target: targetRoomId,
+            });
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error triggering sabotage:', err);
+            return Response.json(
+              { error: 'Failed to trigger sabotage' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
         // 404
         return new Response('Not Found', { status: 404, headers: corsHeaders });
       },
     });
+
+    // Store server reference and update port if using port 0
+    this.server = server;
+    this.port = server.port ?? this.port;
 
     console.log(`🚀 Game server started on http://${this.hostname}:${this.port}`);
   }
@@ -481,6 +579,13 @@ export class GameServer {
    */
   getGameCoordinator(): GameCoordinator {
     return this.gameCoordinator;
+  }
+
+  /**
+   * Get the actual port the server is listening on
+   */
+  getPort(): number {
+    return this.port;
   }
 
   /**

@@ -140,7 +140,7 @@ export class SabotageSystem {
         const state = this.minigameManager.getMinigameState(playerId, minigameType);
         if (state && !this.minigameManager.isMinigameComplete(playerId, minigameType)) {
           hasActiveMinigame = true;
-          activeMinigameType = minigageType;
+          activeMinigameType = minigameType;
           break;
         }
       }
@@ -410,5 +410,12 @@ export class SabotageSystem {
     this.clearSabotageTimer();
     this.currentSabotage = null;
     this.lastSabotageTime = 0;
+  }
+
+  /**
+   * Cleanup sabotage system (for game cleanup)
+   */
+  cleanup(): void {
+    this.reset();
   }
 }
