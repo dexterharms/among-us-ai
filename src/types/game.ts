@@ -18,6 +18,7 @@ export enum InteractableType {
   LOG = 'Log',
   DOOR = 'Door',
   TASK = 'Task',
+  VENT = 'Vent',
 }
 
 export enum GamePhase {
@@ -49,6 +50,7 @@ export enum EventType {
   PLAYER_EJECTED = 'PlayerEjected',
   PLAYER_KILLED = 'PlayerKilled', // Broadcast when a player is killed
   YOU_DIED = 'YouDied', // Private event sent to victim
+  PLAYER_VENTED = 'PlayerVented', // Broadcast when imposter uses vent
   TASK_COMPLETED = 'TaskCompleted',
   TASK_FAILED = 'TaskFailed',
   ROUND_STARTED = 'RoundStarted',
@@ -187,6 +189,10 @@ export const GameEndedPayload = z.object({
   winner: z.union([z.literal('Crewmates'), z.literal('Imposters'), PlayerRoleSchema]),
   reason: z.string(),
 });
+export const PlayerVentedPayload = z.object({
+  playerId: z.string(),
+  roomId: z.string(),
+});
 export const RoleRevealedPayload = z.object({ playerId: z.string(), role: PlayerRoleSchema });
 
 // Lobby Event Payloads
@@ -321,6 +327,10 @@ export const PlayerKilledEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.PLAYER_KILLED),
   payload: PlayerKilledPayload,
 });
+export const PlayerVentedEventSchema = BaseEventSchema.extend({
+  type: z.literal(EventType.PLAYER_VENTED),
+  payload: PlayerVentedPayload,
+});
 export const YouDiedEventSchema = BaseEventSchema.extend({
   type: z.literal(EventType.YOU_DIED),
   payload: YouDiedPayload,
@@ -402,6 +412,7 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   GameOverSummaryEventSchema,
   RoleRevealedEventSchema,
   PlayerKilledEventSchema,
+  PlayerVentedEventSchema,
   YouDiedEventSchema,
   TaskCompletedEventSchema,
   TaskFailedEventSchema,

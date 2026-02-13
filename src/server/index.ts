@@ -1,10 +1,12 @@
 import { serve } from 'bun';
 import { GameState } from '@/game/state';
 import { GameCoordinator } from '@/game/coordinator';
+import { ImposterAbilities } from '@/game/imposter';
 import { LobbyManager } from '@/lobby/manager';
 import { Player, PlayerRole, PlayerStatus } from '@/types/game';
 import { RoomManager } from '@/game/rooms';
 import { TaskManager } from '@/game/tasks';
+import { ImposterAbilities } from '@/game/imposter';
 
 /**
  * Bun HTTP Server
@@ -542,6 +544,34 @@ export class GameServer {
             console.error('Error calling emergency:', err);
             return Response.json(
               { error: 'Failed to call emergency meeting' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
+        // API: Vent travel
+        if (url.pathname === '/api/game/vent' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, targetRoomId } = body as {
+              playerId: string;
+              targetRoomId: string;
+            };
+
+            if (!playerId || !targetRoomId) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, targetRoomId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            const result = this.gameState.getImposterAbilities().attemptVent(playerId, targetRoomId);
+
+            return Response.json(result, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error venting:', err);
+            return Response.json(
+              { error: 'Failed to vent' },
               { status: 500, headers: corsHeaders },
             );
           }

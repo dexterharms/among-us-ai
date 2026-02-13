@@ -6,6 +6,8 @@ import { logger } from '@/utils/logger';
 export class ImposterAbilities {
   private killCooldowns: Map<string, number> = new Map();
   private readonly KILL_COOLDOWN = 30000; // 30 seconds in ms
+  private ventCooldowns: Map<string, number> = new Map();
+  private readonly VENT_COOLDOWN = 30000; // 30 seconds in ms
 
   private gameState: GameState;
   private sseManager: SSEManager;
@@ -170,6 +172,137 @@ export class ImposterAbilities {
    */
   getCooldownRemaining(imposterId: string): number {
     const cooldownEnd = this.killCooldowns.get(imposterId) || 0;
+    return Math.max(0, cooldownEnd - Date.now());
+  }
+
+  /**
+   * Check if player can use vent
+   */
+  canVent(playerId: string, targetRoomId: string): boolean {
+    const player = this.gameState.players.get(playerId);
+    const targetRoom = this.gameState.rooms.get(targetRoomId);
+
+    if (!player || !targetRoom) {
+      return false;
+    }
+
+    // 1. Role check - only imposters can use vents
+    if (player.role !== PlayerRole.IMPOSTER) {
+      return false;
+    }
+
+    // 2. Status check - must be alive
+    if (player.status !== PlayerStatus.ALIVE) {
+      return false;
+    }
+
+    // 3. Phase check - only during ROUND phase
+    if (this.gameState.phase !== GamePhase.ROUND) {
+      return false;
+    }
+
+    // 4. Location check - must be in same room as vent
+    if (player.location.roomId !== targetRoomId) {
+      return false;
+    }
+
+    // 5. Find vent in current room
+    const currentRoom = this.gameState.rooms.get(player.location.roomId);
+    const currentVent = currentRoom?.interactables.find(
+      (i) => i.type === 'Vent' as any
+    );
+
+    if (!currentVent) {
+      return false;
+    }
+
+    // 6. Find vent in target room
+    const targetVent = targetRoom.interactables.find(
+      (i) => i.type === 'Vent' as any
+    );
+
+    if (!targetVent) {
+      return false;
+    }
+
+    // 7. Cooldown check
+    const cooldownEnd = this.ventCooldowns.get(playerId) || 0;
+    if (Date.now() < cooldownEnd) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Attempt to use vent to travel to another room
+   */
+  attemptVent(playerId: string, targetRoomId: string): void {
+    const player = this.gameState.players.get(playerId);
+    const targetRoom = this.gameState.rooms.get(targetRoomId);
+
+    if (!player || !targetRoom) {
+      logger.warn('Invalid vent attempt: Player or room not found', {
+        playerId,
+        targetRoomId,
+        playerExists: !!player,
+        roomExists: !!targetRoom,
+      });
+      return;
+    }
+
+    if (!this.canVent(playerId, targetRoomId)) {
+      logger.warn('Vent failed: Conditions not met', {
+        playerId,
+        targetRoomId,
+        role: player.role,
+        status: player.status,
+        phase: this.gameState.phase,
+        currentRoom: player.location.roomId,
+        targetRoom: targetRoomId,
+        cooldownRemaining: this.getVentCooldownRemaining(playerId),
+      });
+      return;
+    }
+
+    // Perform vent travel
+    player.location = {
+      roomId: targetRoomId,
+      x: targetRoom.position.x,
+      y: targetRoom.position.y,
+    };
+
+    // Set vent cooldown
+    this.ventCooldowns.set(playerId, Date.now() + this.VENT_COOLDOWN);
+
+    logger.logGameEvent('VentUsed', {
+      playerId,
+      playerName: player.name,
+      targetRoomId,
+      fromRoomId: player.location.roomId,
+      roundNumber: this.gameState.getRoundNumber(),
+    });
+
+    // Broadcast PLAYER_VENTED event
+    const playerVenturedEvent: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.PLAYER_VENTED,
+      payload: {
+        playerId,
+        roomId: targetRoomId,
+      },
+    };
+    this.sseManager.sendTo(playerId, playerVenturedEvent);
+
+    // Check Win Condition after vent
+    this.checkWinCondition();
+  }
+
+  /**
+   * Get remaining vent cooldown for a player
+   */
+  getVentCooldownRemaining(playerId: string): number {
+    const cooldownEnd = this.ventCooldowns.get(playerId) || 0;
     return Math.max(0, cooldownEnd - Date.now());
   }
 }

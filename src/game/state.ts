@@ -596,6 +596,13 @@ export class GameState {
     return this.emergencyButtonSystem;
   }
 
+  getImposterAbilities(): ImposterAbilities {
+    if (!this.imposterAbilities) {
+      this.imposterAbilities = new ImposterAbilities(this, this.getSSEManager());
+    }
+    return this.imposterAbilities;
+  }
+
   /**
    * Call an emergency meeting
    */
