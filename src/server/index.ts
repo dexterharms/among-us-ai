@@ -164,7 +164,10 @@ export class GameServer {
 
             this.lobbyManager.join(player);
 
-            return Response.json({ success: true, player }, { headers: corsHeaders });
+            // Generate authentication token for the player
+            const token = await this.lobbyManager.generatePlayerToken(player.id);
+
+            return Response.json({ success: true, player, token }, { headers: corsHeaders });
           } catch (err) {
             console.error('Error joining lobby:', err);
             return Response.json(

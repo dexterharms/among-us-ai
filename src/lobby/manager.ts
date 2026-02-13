@@ -1,6 +1,7 @@
 import { Player, PlayerRole, EventType, GameEvent } from '@/types/game';
 import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
+import { generateToken } from '@/utils/jwt';
 
 export class LobbyManager {
   private players: Map<string, Player> = new Map();
@@ -222,5 +223,14 @@ export class LobbyManager {
 
   getPlayerCount(): number {
     return this.players.size;
+  }
+
+  /**
+   * Generate an authentication token for a player
+   * @param playerId - The player's unique identifier
+   * @returns A JWT token string
+   */
+  async generatePlayerToken(playerId: string): Promise<string> {
+    return await generateToken(playerId);
   }
 }
