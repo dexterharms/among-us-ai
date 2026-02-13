@@ -1,12 +1,10 @@
 import { serve } from 'bun';
 import { GameState } from '@/game/state';
 import { GameCoordinator } from '@/game/coordinator';
-import { ImposterAbilities } from '@/game/imposter';
 import { LobbyManager } from '@/lobby/manager';
 import { Player, PlayerRole, PlayerStatus } from '@/types/game';
 import { RoomManager } from '@/game/rooms';
 import { TaskManager } from '@/game/tasks';
-import { ImposterAbilities } from '@/game/imposter';
 
 /**
  * Bun HTTP Server
@@ -565,9 +563,9 @@ export class GameServer {
               );
             }
 
-            const result = this.gameState.getImposterAbilities().attemptVent(playerId, targetRoomId);
+            this.gameState.getImposterAbilities().attemptVent(playerId, targetRoomId);
 
-            return Response.json(result, { headers: corsHeaders });
+            return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
             console.error('Error venting:', err);
             return Response.json(

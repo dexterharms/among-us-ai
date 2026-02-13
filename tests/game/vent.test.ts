@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { ImposterAbilities } from '@/game/imposter';
 import { GameState } from '@/game/state';
-import { PlayerRole, PlayerStatus, GamePhase } from '@/types/game';
+import { PlayerRole, PlayerStatus, GamePhase, InteractableType, type Player } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
 
 describe('ImposterAbilities - Vent System', () => {
@@ -42,7 +42,7 @@ describe('ImposterAbilities - Vent System', () => {
       if (room) {
         room.interactables.push({
           id: 'vent-1',
-          type: 'Vent' as any,
+          type: InteractableType.VENT,
           name: 'Vent',
           action: 'Use Vent',
           x: 1,
@@ -50,29 +50,29 @@ describe('ImposterAbilities - Vent System', () => {
         });
       }
 
-      const result = imposterAbilities['canVent'](imposter, 'center');
+      const result = imposterAbilities['canVent'](imposter.id, 'center');
       expect(result).toBe(true);
     });
 
     test('returns false when player is not imposter', () => {
-      const result = imposterAbilities['canVent'](crewmate, 'center');
+      const result = imposterAbilities['canVent'](crewmate.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when player is dead', () => {
       imposter.status = PlayerStatus.DEAD;
-      const result = imposterAbilities['canVent'](imposter, 'center');
+      const result = imposterAbilities['canVent'](imposter.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when game phase is not ROUND', () => {
       gameState.setPhase(GamePhase.LOBBY);
-      const result = imposterAbilities['canVent'](imposter, 'center');
+      const result = imposterAbilities['canVent'](imposter.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when room has no vent', () => {
-      const result = imposterAbilities['canVent'](imposter, 'center');
+      const result = imposterAbilities['canVent'](imposter.id, 'center');
       expect(result).toBe(false);
     });
   });
@@ -86,7 +86,7 @@ describe('ImposterAbilities - Vent System', () => {
       if (centerRoom) {
         centerRoom.interactables.push({
           id: 'vent-center',
-          type: 'Vent' as any,
+          type: InteractableType.VENT,
           name: 'Vent to Hallway',
           action: 'Use Vent',
           x: 1,
@@ -97,7 +97,7 @@ describe('ImposterAbilities - Vent System', () => {
       if (hallwayRoom) {
         hallwayRoom.interactables.push({
           id: 'vent-hallway-west',
-          type: 'Vent' as any,
+          type: InteractableType.VENT,
           name: 'Vent to Center',
           action: 'Use Vent',
           x: -1,
@@ -109,6 +109,8 @@ describe('ImposterAbilities - Vent System', () => {
     });
 
     test('should move imposter to connected vent room', () => {
+      const hallwayRoom = gameState.rooms.get('hallway-west');
+
       imposterAbilities.attemptVent(imposter.id, 'hallway-west');
 
       expect(imposter.location.roomId).toBe('hallway-west');
@@ -117,16 +119,16 @@ describe('ImposterAbilities - Vent System', () => {
     });
 
     test('should fail if player is not imposter', () => {
-      const originalLocation = imposter.location;
+      const originalLocation = { ...crewmate.location };
 
       imposterAbilities.attemptVent(crewmate.id, 'hallway-west');
 
-      expect(imposter.location).toEqual(originalLocation);
+      expect(crewmate.location).toEqual(originalLocation);
     });
 
     test('should fail if player is dead', () => {
       imposter.status = PlayerStatus.DEAD;
-      const originalLocation = imposter.location;
+      const originalLocation = { ...imposter.location };
 
       imposterAbilities.attemptVent(imposter.id, 'hallway-west');
 
@@ -135,7 +137,7 @@ describe('ImposterAbilities - Vent System', () => {
 
     test('should fail if game phase is not ROUND', () => {
       gameState.setPhase(GamePhase.LOBBY);
-      const originalLocation = imposter.location;
+      const originalLocation = { ...imposter.location };
 
       imposterAbilities.attemptVent(imposter.id, 'hallway-west');
 
@@ -143,7 +145,13 @@ describe('ImposterAbilities - Vent System', () => {
     });
 
     test('should fail if current room has no vent', () => {
-      const originalLocation = imposter.location;
+      // Move imposter to a room without vents (and remove vents from center for this test)
+      const room = gameState.rooms.get('center');
+      if (room) {
+        room.interactables = room.interactables.filter(i => i.type !== InteractableType.VENT);
+      }
+
+      const originalLocation = { ...imposter.location };
 
       imposterAbilities.attemptVent(imposter.id, 'hallway-west');
 
@@ -151,20 +159,88 @@ describe('ImposterAbilities - Vent System', () => {
     });
 
     test('should fail if target room has no vent', () => {
-      imposter.location = { roomId: 'hallway-west', x: -1, y: 0 };
+      // Remove vent from hallway-west for this test
+      const hallwayRoom = gameState.rooms.get('hallway-west');
+      if (hallwayRoom) {
+        hallwayRoom.interactables = hallwayRoom.interactables.filter(i => i.type !== InteractableType.VENT);
+      }
 
-      const originalLocation = imposter.location;
+      const originalLocation = { ...imposter.location };
 
-      imposterAbilities.attemptVent(imposter.id, 'center');
+      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
 
       expect(imposter.location).toEqual(originalLocation);
     });
   });
 
   describe('ventCooldown', () => {
+    beforeEach(() => {
+      // Add vents to rooms for testing
+      const centerRoom = gameState.rooms.get('center');
+      const hallwayRoom = gameState.rooms.get('hallway-west');
+
+      if (centerRoom) {
+        centerRoom.interactables.push({
+          id: 'vent-center',
+          type: InteractableType.VENT,
+          name: 'Vent to Hallway',
+          action: 'Use Vent',
+          x: 1,
+          y: 1,
+        });
+      }
+
+      if (hallwayRoom) {
+        hallwayRoom.interactables.push({
+          id: 'vent-hallway-west',
+          type: InteractableType.VENT,
+          name: 'Vent to Center',
+          action: 'Use Vent',
+          x: -1,
+          y: 1,
+        });
+      }
+
+      gameState.setPhase(GamePhase.ROUND);
+    });
+
     test('should have VENT_COOLDOWN defined', () => {
       expect(imposterAbilities['VENT_COOLDOWN']).toBeDefined();
       expect(typeof imposterAbilities['VENT_COOLDOWN']).toBe('number');
+    });
+
+    test('should set cooldown after venting', () => {
+      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+
+      // Cooldown should be set (non-zero)
+      const remaining = imposterAbilities.getVentCooldownRemaining(imposter.id);
+      expect(remaining).toBeGreaterThan(0);
+    });
+
+    test('should prevent venting during cooldown', () => {
+      // First vent
+      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      expect(imposter.location.roomId).toBe('hallway-west');
+
+      const originalLocation = { ...imposter.location };
+
+      // Try to vent again immediately (should fail due to cooldown)
+      imposterAbilities.attemptVent(imposter.id, 'center');
+
+      // Location should not change
+      expect(imposter.location).toEqual(originalLocation);
+    });
+
+    test('should allow venting after cooldown expires', () => {
+      // First vent
+      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+
+      // Manually expire the cooldown
+      (imposterAbilities as any).ventCooldowns.set(imposter.id, Date.now() - 1);
+
+      // Should be able to vent again
+      imposterAbilities.attemptVent(imposter.id, 'center');
+      expect(imposter.location.roomId).toBe('center');
     });
   });
 

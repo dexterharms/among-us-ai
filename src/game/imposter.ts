@@ -1,4 +1,4 @@
-import { Player, PlayerStatus, PlayerRole, GamePhase, EventType, GameEvent } from '@/types/game';
+import { Player, PlayerStatus, PlayerRole, GamePhase, EventType, GameEvent, InteractableType } from '@/types/game';
 import { GameState } from './state';
 import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
@@ -201,31 +201,26 @@ export class ImposterAbilities {
       return false;
     }
 
-    // 4. Location check - must be in same room as vent
-    if (player.location.roomId !== targetRoomId) {
-      return false;
-    }
-
-    // 5. Find vent in current room
+    // 4. Find vent in current room (player must be in a room with a vent)
     const currentRoom = this.gameState.rooms.get(player.location.roomId);
     const currentVent = currentRoom?.interactables.find(
-      (i) => i.type === 'Vent' as any
+      (i) => i.type === InteractableType.VENT
     );
 
     if (!currentVent) {
       return false;
     }
 
-    // 6. Find vent in target room
+    // 5. Find vent in target room (destination must have a vent)
     const targetVent = targetRoom.interactables.find(
-      (i) => i.type === 'Vent' as any
+      (i) => i.type === InteractableType.VENT
     );
 
     if (!targetVent) {
       return false;
     }
 
-    // 7. Cooldown check
+    // 6. Cooldown check
     const cooldownEnd = this.ventCooldowns.get(playerId) || 0;
     if (Date.now() < cooldownEnd) {
       return false;
@@ -265,6 +260,9 @@ export class ImposterAbilities {
       return;
     }
 
+    // Store original room before updating location
+    const fromRoomId = player.location.roomId;
+
     // Perform vent travel
     player.location = {
       roomId: targetRoomId,
@@ -279,7 +277,7 @@ export class ImposterAbilities {
       playerId,
       playerName: player.name,
       targetRoomId,
-      fromRoomId: player.location.roomId,
+      fromRoomId,
       roundNumber: this.gameState.getRoundNumber(),
     });
 
@@ -293,9 +291,6 @@ export class ImposterAbilities {
       },
     };
     this.sseManager.sendTo(playerId, playerVenturedEvent);
-
-    // Check Win Condition after vent
-    this.checkWinCondition();
   }
 
   /**

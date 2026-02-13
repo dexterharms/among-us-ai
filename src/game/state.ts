@@ -19,6 +19,7 @@ import { TaskManager } from './tasks';
 import { SabotageSystem } from './sabotage';
 import { MinigameManager } from '@/tasks';
 import { EmergencyButtonSystem } from './emergency-button';
+import { ImposterAbilities } from './imposter';
 
 export class GameState {
   private phase: GamePhase = GamePhase.LOBBY;
@@ -55,6 +56,7 @@ export class GameState {
   private minigameManager: MinigameManager;
   private roundStartTime: number = 0;
   private emergencyButtonSystem: EmergencyButtonSystem;
+  private imposterAbilities?: ImposterAbilities;
 
   constructor() {
     this.roomManager = new RoomManager();
