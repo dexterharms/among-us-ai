@@ -8,10 +8,20 @@ export class LobbyManager {
   private readyStatus: Set<string> = new Set();
   private isCountdownActive: boolean = false;
   private readonly MIN_PLAYERS = 3;
+  private readonly COUNTDOWN_DURATION = 5000; // 5 seconds
   private sseManager: SSEManager;
+  private onCountdownComplete: (() => void) | null = null;
+  private countdownTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(sseManager: SSEManager) {
     this.sseManager = sseManager;
+  }
+
+  /**
+   * Set a callback to be invoked when the countdown completes and game should start
+   */
+  setOnCountdownComplete(callback: () => void): void {
+    this.onCountdownComplete = callback;
   }
 
   join(player: Player): void {
@@ -151,15 +161,40 @@ export class LobbyManager {
     logger.logGameEvent('CountdownStarted', {
       readyPlayers: this.readyStatus.size,
       totalPlayers: this.players.size,
-      duration: 5,
+      duration: this.COUNTDOWN_DURATION / 1000,
     });
 
     const event: GameEvent = {
       timestamp: Date.now(),
       type: EventType.COUNTDOWN_STARTED,
-      payload: { duration: 5 },
+      payload: { duration: this.COUNTDOWN_DURATION / 1000 },
     };
     this.sseManager.broadcast(event);
+
+    // Start the actual countdown timer
+    this.countdownTimer = setTimeout(() => {
+      this.isCountdownActive = false;
+      logger.logGameEvent('CountdownComplete', {
+        readyPlayers: this.readyStatus.size,
+        totalPlayers: this.players.size,
+      });
+
+      // Trigger game start if callback is set
+      if (this.onCountdownComplete) {
+        this.onCountdownComplete();
+      }
+    }, this.COUNTDOWN_DURATION);
+  }
+
+  /**
+   * Cancel any active countdown
+   */
+  cancelCountdown(): void {
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.isCountdownActive = false;
   }
 
   assignRoles(): { crewmates: string[]; imposters: string[] } {

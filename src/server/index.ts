@@ -29,6 +29,10 @@ export class GameServer {
       this.gameState,
       this.gameState.getSSEManager(),
     );
+    // Wire up countdown to trigger game start
+    this.lobbyManager.setOnCountdownComplete(() => {
+      this.gameCoordinator.startGame();
+    });
   }
 
   /**
