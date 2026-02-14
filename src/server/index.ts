@@ -29,6 +29,10 @@ export class GameServer {
       this.gameState,
       this.gameState.getSSEManager(),
     );
+    // Wire up countdown to trigger game start
+    this.lobbyManager.setOnCountdownComplete(() => {
+      this.gameCoordinator.startGame();
+    });
   }
 
   /**
@@ -646,6 +650,8 @@ export class GameServer {
    * Stop the HTTP server
    */
   stop(): void {
+    // Clean up any active countdown timer
+    this.lobbyManager.cancelCountdown();
     if (this.server) {
       this.server.stop();
       this.server = null;
