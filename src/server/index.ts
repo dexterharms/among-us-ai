@@ -650,6 +650,8 @@ export class GameServer {
    * Stop the HTTP server
    */
   stop(): void {
+    // Clean up any active countdown timer
+    this.lobbyManager.cancelCountdown();
     if (this.server) {
       this.server.stop();
       this.server = null;

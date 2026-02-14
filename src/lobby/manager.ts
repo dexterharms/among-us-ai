@@ -8,6 +8,7 @@ export class LobbyManager {
   private readyStatus: Set<string> = new Set();
   private isCountdownActive: boolean = false;
   private readonly MIN_PLAYERS = 3;
+  private readonly MAX_PLAYERS = 15; // Among Us max players
   private readonly COUNTDOWN_DURATION = 5000; // 5 seconds
   private sseManager: SSEManager;
   private onCountdownComplete: (() => void) | null = null;
@@ -25,6 +26,11 @@ export class LobbyManager {
   }
 
   join(player: Player): void {
+    // Prevent lobby overflow
+    if (this.players.size >= this.MAX_PLAYERS && !this.players.has(player.id)) {
+      throw new Error('Lobby is full');
+    }
+
     // If player is already in lobby (rejoining), clear their ready status
     const isRejoining = this.players.has(player.id);
     if (isRejoining) {
@@ -71,17 +77,7 @@ export class LobbyManager {
 
       // Cancel countdown only if ready players falls below MIN_PLAYERS
       if (this.isCountdownActive && this.readyStatus.size < this.MIN_PLAYERS) {
-        this.isCountdownActive = false;
-        logger.info('Countdown cancelled due to insufficient players', {
-          readyPlayers: this.readyStatus.size,
-          minPlayers: this.MIN_PLAYERS,
-        });
-        const cancelEvent: GameEvent = {
-          timestamp: Date.now(),
-          type: EventType.COUNTDOWN_CANCELLED,
-          payload: {},
-        };
-        this.sseManager.broadcast(cancelEvent);
+        this.cancelCountdownWithBroadcast();
       }
 
       this.broadcastLobbyState();
@@ -131,17 +127,7 @@ export class LobbyManager {
     } else {
       // Cancel countdown only if ready players falls below MIN_PLAYERS
       if (this.isCountdownActive && this.readyStatus.size < this.MIN_PLAYERS) {
-        this.isCountdownActive = false;
-        logger.info('Countdown cancelled due to insufficient ready players', {
-          readyPlayers: this.readyStatus.size,
-          minPlayers: this.MIN_PLAYERS,
-        });
-        const cancelEvent: GameEvent = {
-          timestamp: Date.now(),
-          type: EventType.COUNTDOWN_CANCELLED,
-          payload: {},
-        };
-        this.sseManager.broadcast(cancelEvent);
+        this.cancelCountdownWithBroadcast();
       }
     }
 
@@ -174,6 +160,7 @@ export class LobbyManager {
     // Start the actual countdown timer
     this.countdownTimer = setTimeout(() => {
       this.isCountdownActive = false;
+      this.countdownTimer = null;
       logger.logGameEvent('CountdownComplete', {
         readyPlayers: this.readyStatus.size,
         totalPlayers: this.players.size,
@@ -195,6 +182,24 @@ export class LobbyManager {
       this.countdownTimer = null;
     }
     this.isCountdownActive = false;
+  }
+
+  /**
+   * Cancel countdown and broadcast cancellation event
+   * Used when countdown is cancelled due to player leaving or unreadying
+   */
+  private cancelCountdownWithBroadcast(): void {
+    this.cancelCountdown();
+    logger.info('Countdown cancelled', {
+      readyPlayers: this.readyStatus.size,
+      minPlayers: this.MIN_PLAYERS,
+    });
+    const cancelEvent: GameEvent = {
+      timestamp: Date.now(),
+      type: EventType.COUNTDOWN_CANCELLED,
+      payload: {},
+    };
+    this.sseManager.broadcast(cancelEvent);
   }
 
   assignRoles(): { crewmates: string[]; imposters: string[] } {
