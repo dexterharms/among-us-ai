@@ -28,7 +28,9 @@ export class LobbyManager {
   join(player: Player): void {
     // Prevent lobby overflow
     if (this.players.size >= this.MAX_PLAYERS && !this.players.has(player.id)) {
-      throw new Error('Lobby is full');
+      throw new Error(
+        `Lobby is full: cannot add player ${player.id} (${player.name}). Current capacity: ${this.players.size}/${this.MAX_PLAYERS}`,
+      );
     }
 
     // If player is already in lobby (rejoining), clear their ready status
@@ -168,7 +170,15 @@ export class LobbyManager {
 
       // Trigger game start if callback is set
       if (this.onCountdownComplete) {
-        this.onCountdownComplete();
+        try {
+          this.onCountdownComplete();
+        } catch (err) {
+          logger.error('Error in countdown completion callback', {
+            error: err instanceof Error ? err.message : String(err),
+            readyPlayers: this.readyStatus.size,
+            totalPlayers: this.players.size,
+          });
+        }
       }
     }, this.COUNTDOWN_DURATION);
   }
