@@ -67,12 +67,15 @@ export class PendingRevealQueue {
 
   /**
    * Remove a specific reveal from queue
+   * Matches by playerId, roomId, direction, type, and ticksRemaining for precise removal
    */
   removeReveal(reveal: PendingReveal): void {
     const entry = Array.from(this.reveals.entries()).find(
       ([_, r]) =>
         r.playerId === reveal.playerId &&
         r.roomId === reveal.roomId &&
+        r.direction === reveal.direction &&
+        r.type === reveal.type &&
         r.ticksRemaining === reveal.ticksRemaining,
     );
     if (entry) {

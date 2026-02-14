@@ -534,6 +534,11 @@ export class GameState {
         oppositeDirection,
         'leave',
       );
+    } else {
+      logger.debug('Skipping reveal queue: direction could not be calculated', {
+        currentRoomId,
+        targetRoomId,
+      });
     }
 
     // For destination room: queue an enter event with the movement direction
@@ -640,8 +645,8 @@ export class GameState {
    * Get the opposite direction for a given movement direction
    * Used for generating leave events when a player exits a room
    */
-  getOppositeDirection(direction: MovementDirection): string {
-    const opposites: Record<MovementDirection, string> = {
+  getOppositeDirection(direction: MovementDirection): MovementDirection {
+    const opposites: Record<MovementDirection, MovementDirection> = {
       north: 'south',
       south: 'north',
       east: 'west',
