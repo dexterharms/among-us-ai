@@ -7,6 +7,7 @@ import {
   PlayerStatus,
   EventType,
   GameEvent,
+  MovementDirection,
 } from '@/types/game';
 import { RoomManager } from './rooms';
 import { logger } from '@/utils/logger';
@@ -20,6 +21,7 @@ import { SabotageSystem } from './sabotage';
 import { MinigameManager } from '@/tasks';
 import { EmergencyButtonSystem } from './emergency-button';
 import { ImposterAbilities } from './imposter';
+import { PendingRevealQueue } from './pending-reveal-queue';
 
 export class GameState {
   private phase: GamePhase = GamePhase.LOBBY;
@@ -57,6 +59,7 @@ export class GameState {
   private roundStartTime: number = 0;
   private emergencyButtonSystem: EmergencyButtonSystem;
   private imposterAbilities?: ImposterAbilities;
+  private pendingRevealQueue: PendingRevealQueue;
 
   constructor() {
     this.roomManager = new RoomManager();
@@ -68,6 +71,7 @@ export class GameState {
     this.tickProcessor = new TickProcessor(this, this.sseManager);
     this.sabotageSystem = new SabotageSystem(this, this.sseManager, this.minigameManager);
     this.emergencyButtonSystem = new EmergencyButtonSystem(this);
+    this.pendingRevealQueue = new PendingRevealQueue();
 
     // Initialize rooms from RoomManager
     this.roomManager.getRooms().forEach((room) => {
@@ -519,6 +523,29 @@ export class GameState {
       y: targetRoom.position.y,
     };
 
+    // Queue pending reveals for source and destination rooms
+    // For source room: queue a leave event with opposite direction
+    const direction = this.roomManager.getDirection(currentRoomId, targetRoomId);
+    if (direction) {
+      const oppositeDirection = this.getOppositeDirection(direction);
+      this.pendingRevealQueue.queueReveal(
+        playerId,
+        currentRoomId,
+        oppositeDirection,
+        'leave',
+      );
+    }
+
+    // For destination room: queue an enter event with the movement direction
+    if (direction) {
+      this.pendingRevealQueue.queueReveal(
+        playerId,
+        targetRoomId,
+        direction,
+        'enter',
+      );
+    }
+
     logger.logGameEvent(EventType.PLAYER_MOVED, {
       playerId,
       playerName: player.name,
@@ -605,6 +632,40 @@ export class GameState {
     return this.imposterAbilities;
   }
 
+  getPendingRevealQueue(): PendingRevealQueue {
+    return this.pendingRevealQueue;
+  }
+
+  /**
+   * Get the opposite direction for a given movement direction
+   * Used for generating leave events when a player exits a room
+   */
+  getOppositeDirection(direction: MovementDirection): string {
+    const opposites: Record<MovementDirection, string> = {
+      north: 'south',
+      south: 'north',
+      east: 'west',
+      west: 'east',
+    };
+    return opposites[direction];
+  }
+
+  /**
+   * Get players who are visible in a room (excluding those with pending enter reveals)
+   * @param roomId - Room ID to get visible players for
+   * @returns Array of players visible in the room
+   */
+  getPlayersVisibleInRoom(roomId: string): Player[] {
+    const pendingReveals = this.pendingRevealQueue.getPendingRevealsForRoom(roomId);
+    const hiddenPlayerIds = new Set(
+      pendingReveals.filter((r) => r.type === 'enter').map((r) => r.playerId),
+    );
+
+    return Array.from(this._players.values()).filter(
+      (p) => p.location.roomId === roomId && !hiddenPlayerIds.has(p.id),
+    );
+  }
+
   /**
    * Call an emergency meeting
    */
@@ -637,5 +698,6 @@ export class GameState {
     this.tickProcessor.reset();
     this.sabotageSystem.reset();
     this.emergencyButtonSystem.reset();
+    this.pendingRevealQueue.clear();
   }
 }
