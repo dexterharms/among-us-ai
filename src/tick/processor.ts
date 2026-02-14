@@ -89,7 +89,10 @@ export class TickProcessor {
       // Step 3: Process all queued player actions in order
       this.processActions();
 
-      // Step 4: Broadcast tick completion event
+      // Step 4: Process pending reveals for delayed information system
+      this.processPendingReveals();
+
+      // Step 5: Broadcast tick completion event
       this.broadcastTickEvent();
 
     } catch (error) {
@@ -445,5 +448,52 @@ export class TickProcessor {
     this.stateMachine.clear();
     this.playerActionTimestamps.clear();
     this.currentTickNumber = 0;
+  }
+
+  /**
+   * Process pending reveals for delayed information system
+   * Called each tick to countdown and reveal players
+   */
+  processPendingReveals(): void {
+    const queue = this.gameState.getPendingRevealQueue();
+
+    // Get reveals that are ready (ticksRemaining === 0)
+    const readyReveals = queue.getReadyReveals();
+
+    // For each ready reveal, check if player is still in room
+    readyReveals.forEach((reveal) => {
+      if (reveal.type === 'enter') {
+        const player = this.gameState.players.get(reveal.playerId);
+        // Only log if player is still in the room (they become visible)
+        if (player && player.location.roomId === reveal.roomId) {
+          logger.debug('Player reveal processed - now visible', {
+            playerId: reveal.playerId,
+            roomId: reveal.roomId,
+          });
+        }
+      }
+      // Remove the reveal regardless
+      queue.removeReveal(reveal);
+    });
+
+    // Decrement all remaining reveals for next tick
+    queue.decrementAll();
+  }
+
+  /**
+   * Get footsteps hints for a room based on pending reveals
+   * Used to generate room descriptions with delayed movement info
+   */
+  getFootstepsHintsForRoom(roomId: string): string[] {
+    const queue = this.gameState.getPendingRevealQueue();
+    const reveals = queue.getPendingRevealsForRoom(roomId);
+
+    return reveals.map((reveal) => {
+      if (reveal.type === 'enter') {
+        return `You hear footsteps from the ${reveal.direction}`;
+      } else {
+        return `You hear footsteps towards the ${reveal.direction}`;
+      }
+    });
   }
 }

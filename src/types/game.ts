@@ -21,6 +21,26 @@ export enum InteractableType {
   VENT = 'Vent',
 }
 
+// --- Delayed Information Types ---
+
+export type MovementDirection = 'north' | 'south' | 'east' | 'west';
+export type RevealType = 'enter' | 'leave';
+
+export const MovementDirectionSchema = z.enum(['north', 'south', 'east', 'west']);
+export const RevealTypeSchema = z.enum(['enter', 'leave']);
+
+export const PendingRevealSchema = z.object({
+  playerId: z.string(),
+  roomId: z.string(),
+  direction: MovementDirectionSchema,
+  ticksRemaining: z.number().int().min(0),
+  type: RevealTypeSchema,
+});
+export type PendingReveal = z.infer<typeof PendingRevealSchema>;
+
+// Configurable constant for reveal delay
+export const REVEAL_DELAY_TICKS = 2;
+
 export enum GamePhase {
   LOBBY = 'Lobby',
   ROUND = 'Round',
