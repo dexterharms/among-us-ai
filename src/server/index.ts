@@ -293,6 +293,63 @@ export class GameServer {
           }
         }
 
+        // API: Kill player (Imposter only)
+        if (url.pathname === '/api/game/kill' && req.method === 'POST') {
+          try {
+            const body = await req.json();
+            const { playerId, targetPlayerId } = body as {
+              playerId: string;
+              targetPlayerId: string;
+            };
+
+            if (!playerId || !targetPlayerId) {
+              return Response.json(
+                { error: 'Missing required fields: playerId, targetPlayerId' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            // Check if player is imposter before attempting kill
+            const player = this.gameState.players.get(playerId);
+            if (!player || player.role !== PlayerRole.IMPOSTER) {
+              return Response.json(
+                { error: 'Only imposters can kill' },
+                { status: 403, headers: corsHeaders },
+              );
+            }
+
+            // Get imposter abilities and attempt kill
+            const imposterAbilities = this.gameState.getImposterAbilities();
+            const target = this.gameState.players.get(targetPlayerId);
+
+            if (!target) {
+              return Response.json(
+                { error: 'Target player not found' },
+                { status: 404, headers: corsHeaders },
+              );
+            }
+
+            // Check if kill is possible before attempting
+            if (!imposterAbilities.canKill(player, target)) {
+              return Response.json(
+                { error: 'Kill not possible: check role, status, location, and cooldown' },
+                { status: 400, headers: corsHeaders },
+              );
+            }
+
+            // Attempt the kill
+            imposterAbilities.attemptKill(playerId, targetPlayerId);
+
+            return Response.json({ success: true }, { headers: corsHeaders });
+          } catch (err) {
+            console.error('Error killing player:', err);
+            return Response.json(
+              { error: 'Failed to kill player' },
+              { status: 500, headers: corsHeaders },
+            );
+          }
+        }
+
         // API: Cast vote
         if (url.pathname === '/api/game/vote' && req.method === 'POST') {
           try {
