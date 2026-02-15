@@ -30,10 +30,17 @@ export function useEventStream(options: SSEOptions) {
   const [error, setError] = useState<string | null>(null);
   const retryCountRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
+    }
+
+    // Clear any existing reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
 
     console.log(`[SSE] Connecting to ${url}...`);
@@ -66,7 +73,7 @@ export function useEventStream(options: SSEOptions) {
         retryCountRef.current++;
         setError(`Reconnecting... (${retryCountRef.current}/${maxRetries})`);
         console.log(`[SSE] Reconnecting in ${reconnectInterval}ms...`);
-        setTimeout(connect, reconnectInterval);
+        reconnectTimeoutRef.current = setTimeout(connect, reconnectInterval);
       } else {
         setError('Connection failed. Max retries reached.');
       }
@@ -74,6 +81,12 @@ export function useEventStream(options: SSEOptions) {
   }, [url, reconnectInterval, maxRetries]);
 
   const disconnect = useCallback(() => {
+    // Clear any pending reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     if (eventSourceRef.current) {
       console.log('[SSE] Disconnecting');
       eventSourceRef.current.close();

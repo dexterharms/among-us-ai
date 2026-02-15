@@ -126,7 +126,7 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
           <h4>Dead Bodies</h4>
           <div className="bodies-grid">
             {gameState.deadBodies.map((body: any, index: number) => (
-              <div key={index} className="body-card">
+              <div key={`${body.playerId}-${index}`} className="body-card">
                 <div className="body-player">Player {body.playerId}</div>
                 <div className="body-location">
                   📍 {body.location?.roomId || 'Unknown'}

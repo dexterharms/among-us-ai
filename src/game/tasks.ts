@@ -248,6 +248,12 @@ export class TaskManager {
 
   /**
    * Legacy method for backward compatibility - marks task as complete directly
+   *
+   * @deprecated Use `startTask()` followed by `submitTaskAction()` instead.
+   *             This method bypasses the minigame system and will be removed in v2.0.
+   *             Migration: Call `startTask(playerId, taskId)` to initialize the minigame,
+   *             then use `submitTaskAction(playerId, taskId, action)` for each minigame action.
+   * @version 1.0
    */
   attemptTask(playerId: string, taskId: string, minigameResult?: boolean): TaskResult {
     const player = this.gameState.players.get(playerId);
