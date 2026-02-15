@@ -158,7 +158,7 @@ export class GameServer {
             const player: Player = {
               id,
               name,
-              role: PlayerRole.CREWMATE,
+              role: PlayerRole.LOYALIST,
               status: PlayerStatus.ALIVE,
               location: {
                 roomId: startRoom?.id || 'cafeteria',
@@ -567,7 +567,7 @@ export class GameServer {
               );
             }
 
-            this.gameState.getImposterAbilities().attemptVent(playerId, targetRoomId);
+            this.gameState.getMoleAbilities().attemptVent(playerId, targetRoomId);
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
@@ -670,7 +670,7 @@ export class GameServer {
       {
         id: 'p1',
         name: 'Alice',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: {
           roomId: rooms[0]?.id || 'room1',
@@ -682,7 +682,7 @@ export class GameServer {
       {
         id: 'p2',
         name: 'Bob',
-        role: PlayerRole.IMPOSTER,
+        role: PlayerRole.MOLE,
         status: PlayerStatus.ALIVE,
         location: {
           roomId: rooms[0]?.id || 'room1',
@@ -694,7 +694,7 @@ export class GameServer {
       {
         id: 'p3',
         name: 'Charlie',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: {
           roomId: rooms[0]?.id || 'room1',

@@ -391,12 +391,12 @@ export class TickProcessor {
   }
 
   private handleKill(playerId: string, payload: any): void {
-    // Delegate to ImposterAbilities (kill)
+    // Delegate to MoleAbilities (kill)
     logger.debug('Kill action queued', { playerId, payload });
   }
 
   private handleVent(playerId: string, payload: any): void {
-    // Delegate to ImposterAbilities (vent)
+    // Delegate to MoleAbilities (vent)
     logger.debug('Vent action queued', { playerId, payload });
   }
 
