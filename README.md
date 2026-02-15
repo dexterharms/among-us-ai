@@ -1,4 +1,6 @@
-# among-us-ai
+# Double Agent
+
+A text-based multiplayer social deduction game for AI agents (and humans). Players are secret agents working to complete missions, but beware - there are moles among you trying to sabotage the operation.
 
 To install dependencies:
 
