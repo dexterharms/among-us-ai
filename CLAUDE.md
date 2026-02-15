@@ -25,7 +25,7 @@ bun run format           # Run Prettier
 
 ## Architecture Overview
 
-This is a **text-based multiplayer social deduction game for AI agents** (inspired by Among Us). No 2D planar movement - players exist "in a room" and all interactions are text-based via REST API and SSE streaming.
+This is **Double Agent** - a text-based multiplayer social deduction game for AI agents. Players are secret agents working to complete missions, but beware - there are moles among you trying to sabotage the operation. No 2D planar movement - players exist "in a room" and all interactions are text-based via REST API and SSE streaming.
 
 ### Technology Stack
 - **Runtime:** Bun (JavaScript runtime, bundler, test framework)
@@ -63,7 +63,7 @@ This is a **text-based multiplayer social deduction game for AI agents** (inspir
 | `src/game/tasks.ts` | TaskManager - task assignment and completion |
 | `src/game/voting.ts` | VotingSystem - council and ejection |
 | `src/game/sabotage.ts` | SabotageSystem - lights, doors, self-destruct |
-| `src/game/imposter.ts` | ImposterAbilities - kill mechanics |
+| `src/game/mole.ts` | MoleAbilities - kill mechanics |
 | `src/sse/manager.ts` | SSEManager - real-time event streaming via better-sse |
 | `src/actions/logger.ts` | ActionLogger - game history with state snapshots |
 | `src/tasks/minigame-manager.ts` | Manages 8 task minigames |
@@ -108,5 +108,5 @@ Tests are in `tests/` directory using Bun's built-in test framework:
 
 ### Documentation
 
-- `docs/plans/among-us-ai.plan.md` - Master plan (800+ lines, comprehensive game design)
+- `docs/plans/double-agent.plan.md` - Master plan (800+ lines, comprehensive game design)
 - `docs/notes/` - Library documentation (better-sse, zod)

@@ -1,12 +1,13 @@
 import type { MapDefinition } from './types';
 
 /**
- * Test map definition - converted from existing ROOMS constant
+ * The Manor - the first map for Double Agent
+ * A sprawling estate with hidden passages and dark corners
  */
 export const TEST_MAP: MapDefinition = {
-  id: 'test-map',
-  name: 'Test Map',
-  description: 'Development map for testing game mechanics',
+  id: 'the-manor',
+  name: 'The Manor',
+  description: 'A sprawling estate with hidden passages and dark corners',
 
   rooms: [
     {

@@ -1,16 +1,18 @@
-# Among Us AI — Master Plan
+# Double Agent - Master Plan
 
 **Created:** 2026-02-11
 **Status:** Active
-**Project:** `~/.dexter/projects/among-us-ai`
+**Project:** `~/.dexter/projects/double-agent`
 
 ---
 
 ## Overview
 
-A text-based multiplayer social deduction game for AI agents (and humans). 4-8 players spawn on a map, complete tasks, and try to identify the imposters among them before being eliminated.
+A text-based multiplayer social deduction game for AI agents (and humans). 4-8 players spawn on a map, complete tasks, and try to identify the moles among them before being eliminated.
 
 **Core Constraint:** No 2D planar movement. Players exist "in a room" or "out of a room." All interactions are text-based via REST API and SSE streaming.
+
+**Note:** This game is inspired by the social deduction game "Among Us" by Innersloth.
 
 ---
 
@@ -38,8 +40,8 @@ A text-based multiplayer social deduction game for AI agents (and humans). 4-8 p
 ### 2. Game Start
 
 **Role Assignment:**
-- 7-8 players: **2 Imposters**
-- 4-6 players: **1 Imposter**
+- 7-8 players: **2 Moles**
+- 4-6 players: **1 Mole**
 - Roles assigned randomly
 - `ROLE_REVEALED` event sent privately to each player
 
@@ -48,7 +50,7 @@ A text-based multiplayer social deduction game for AI agents (and humans). 4-8 p
 - Each player assigned random subset of tasks from map's task pool
 
 **Phase Transition:**
-- `GAME_STARTED` event broadcast with player count and imposter count
+- `GAME_STARTED` event broadcast with player count and mole count
 - `ROUND_STARTED` event broadcast
 - Game enters Round phase
 
@@ -127,7 +129,7 @@ POST /api/game/task
 }
 ```
 
-**Kill (Imposter Only):**
+**Kill (Mole Only):**
 ```typescript
 POST /api/game/kill
 {
@@ -135,7 +137,7 @@ POST /api/game/kill
 }
 ```
 
-**Vent (Imposter Only):**
+**Vent (Mole Only):**
 ```typescript
 POST /api/game/vent
 {
@@ -143,7 +145,7 @@ POST /api/game/vent
 }
 ```
 
-**Sabotage (Imposter Only):**
+**Sabotage (Mole Only):**
 ```typescript
 POST /api/game/sabotage
 {
@@ -177,9 +179,9 @@ When a player enters/leaves a room:
 **Player Actions:**
 - `POST /api/game/move` — Move to connected room
 - `POST /api/game/task` — Attempt task at current location
-- `POST /api/game/kill` — (Imposters only) Kill player in same room
-- `POST /api/game/vent` — (Imposters only) Travel through vent to connected vent
-- `POST /api/game/sabotage` — (Imposters only) Trigger sabotage
+- `POST /api/game/kill` — (Moles only) Kill player in same room
+- `POST /api/game/vent` — (Moles only) Travel through vent to connected vent
+- `POST /api/game/sabotage` — (Moles only) Trigger sabotage
 - `POST /api/game/report` — Report dead body in room
 - `POST /api/game/button` — Press emergency meeting button (council room only)
 
@@ -223,7 +225,7 @@ When a player enters/leaves a room:
 - Tasks are interactable objects in rooms
 - Task completion updates player's individual progress
 - Task progress is NOT announced (no "Player A completed task" logs)
-- Imposters cannot complete tasks (but can pretend — see Fake Tasks)
+- Moles cannot complete tasks (but can pretend — see Fake Tasks)
 
 **Task Interaction Flow:**
 1. Player (roaming) sends `POST /api/game/task { action: "start", taskId: "..." }`
@@ -235,7 +237,7 @@ When a player enters/leaves a room:
 7. On completion: Player state returns to "roaming"
 
 **Sabotage During Tasks:**
-- Crewmates on tasks are forced to quit
+- Loyalists on tasks are forced to quit
 - Next tick includes sabotage flavor text and exit reminders
 - Some tasks reset progress on quit (hold button), others don't (sequence repetition)
 
@@ -243,17 +245,17 @@ When a player enters/leaves a room:
 - Dead players (ghosts) MUST continue completing tasks
 - Ghosts cannot interact in council (no voting, no discussion)
 - Ghosts must wait for council to complete before resuming tasks
-- Ghost task progress counts toward crewmate win condition
+- Ghost task progress counts toward loyalist win condition
 
-**Fake Tasks (Imposters):**
-- Imposters cannot actually complete tasks
+**Fake Tasks (Moles):**
+- Moles cannot actually complete tasks
 - No logs announce task progress
-- Players cannot prove they're crewmate by performing tasks
-- The opposite is also true: not performing tasks doesn't prove imposter
+- Players cannot prove they're loyalist by performing tasks
+- The opposite is also true: not performing tasks doesn't prove mole
 
 **Task Win Condition:**
-- When all LIVING crewmates complete all their tasks, crewmates win
-- Dead crewmates' tasks do NOT count (only living)
+- When all LIVING loyalists complete all their tasks, loyalists win
+- Dead loyalists' tasks do NOT count (only living)
 
 ---
 
@@ -425,7 +427,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 - Player task load = sum of difficulty scores for assigned tasks
 - Harder tasks (sliding tile, battleship) may sink fewer ships to balance
 - Easy tasks (hot-n-cold, hold button) may have higher completion requirements
-- Some tasks are not task-load tunable. 
+- Some tasks are not task-load tunable.
 
 **Task Assignment:**
 - Map defines task pool per room
@@ -436,7 +438,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 
 ### 6. Sabotage
 
-**Imposter-Only Action:**
+**Mole-Only Action:**
 - `POST /api/game/sabotage` — Trigger sabotage
 - Cooldown: ~60 seconds (may vary by type)
 
@@ -446,7 +448,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 |------|--------|------------|
 | **Lights Out** | Room visibility lost, only exits visible | 4 global light switches (flip-switch-1, flip-switch-2, etc.) |
 | **Doors** | Exits require 2-digit code entry | Enter code one digit at a time |
-| **Self-Destruct** | Global timer starts | At least one crewmate presses stop button |
+| **Self-Destruct** | Global timer starts | At least one loyalist presses stop button |
 
 **Lights Out Details:**
 - 4 global light switches
@@ -456,26 +458,26 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 - Exits still visible (like exit signs)
 
 **Sabotage During Tasks:**
-- Crewmates on tasks are forced to quit
+- Loyalists on tasks are forced to quit
 - Next tick includes sabotage flavor text and exit reminders
 
 ### 7. Vents
 
-**Imposter-Only Transportation:**
+**Mole-Only Transportation:**
 - Vents are interactables in specific rooms
 - Vent network connects certain rooms
-- Imposters can instantly travel between connected vents
-- **NOT visible to crewmates** (currently, may change later)
+- Moles can instantly travel between connected vents
+- **NOT visible to loyalists** (currently, may change later)
 
 ### 8. Kills
 
-**Imposter-Only Action:**
+**Mole-Only Action:**
 - `POST /api/game/kill` — Kill player in same room
-- Requires: Imposter role, alive status, same room as target, not on cooldown
+- Requires: Mole role, alive status, same room as target, not on cooldown
 
 **Kill Cooldown:**
-- 30 seconds per imposter
-- Tracked individually per imposter
+- 30 seconds per mole
+- Tracked individually per mole
 
 **Kill Effects:**
 - Target status set to `DEAD`
@@ -491,13 +493,13 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 
 ### 9. Win Conditions
 
-**Crewmates Win:**
-- All living crewmates complete all their tasks, OR
-- All imposters are ejected
+**Loyalists Win:**
+- All living loyalists complete all their tasks, OR
+- All moles are ejected
 
-**Imposters Win:**
-- Number of living imposters ≥ number of living crewmates, OR
-- Sabotage critical system and crewmates fail to fix in time
+**Moles Win:**
+- Number of living moles >= number of living loyalists, OR
+- Sabotage critical system and loyalists fail to fix in time
 
 **Win Check Triggers:**
 - After every kill
@@ -573,7 +575,7 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
   - Tasks (specific to map)
   - Emergency button (council room only)
   - Logs terminal (logs room only)
-  - Vents (imposter-only, specific rooms)
+  - Vents (mole-only, specific rooms)
   - Sabotage fix points (specific to sabotage type)
 
 ---
@@ -589,9 +591,9 @@ POST /api/game/task { action: "fill" | "pour" | "empty", taskId: "fuel-transfer"
 - `POST /api/game/start` — Start game (automatic after lobby timer)
 - `POST /api/game/move` — Move to connected room
 - `POST /api/game/task` — Attempt task
-- `POST /api/game/kill` — (Imposters) Kill player
-- `POST /api/game/vent` — (Imposters) Travel through vent
-- `POST /api/game/sabotage` — (Imposters) Trigger sabotage
+- `POST /api/game/kill` — (Moles) Kill player
+- `POST /api/game/vent` — (Moles) Travel through vent
+- `POST /api/game/sabotage` — (Moles) Trigger sabotage
 - `POST /api/game/report` — Report dead body
 - `POST /api/game/button` — Press emergency button
 - `POST /api/game/vote` — Cast vote in council
@@ -642,7 +644,7 @@ These are explicitly NOT being implemented:
 - **2D planar movement** (players are in/out of rooms, not coordinates)
 - **Complex traversal** (moving platforms, ladders, etc.)
 - **Animation confirmation** (no visual task progress)
-- **Visual tasks** (no way to prove crewmate via task)
+- **Visual tasks** (no way to prove loyalist via task)
 - **Special game modes** (Hide & Seek, etc.)
 - **Game settings configuration** (hardcoded for MVP)
 - **Ghost haunting** (complex, post-MVP)
@@ -651,7 +653,7 @@ These are explicitly NOT being implemented:
 
 ## Implementation Status
 
-### ✅ Completed (MVP Core)
+### Completed (MVP Core)
 - [x] REST API for game actions
 - [x] SSE streaming for real-time events
 - [x] Lobby system (join/leave)
@@ -662,15 +664,15 @@ These are explicitly NOT being implemented:
 - [x] Win condition detection
 - [x] Voting system with timeout
 - [x] Player ejection
-- [x] Task system with win condition (living crewmates only)
+- [x] Task system with win condition (living loyalists only)
 - [x] Task type definitions (tasks for Map 0)
 - [x] Action logging
 
-### 🔄 In Progress
+### In Progress
 - [ ] React web UI for visualization
 - [ ] Dark/light theme toggle
 
-### 📋 Planned (MVP Remaining)
+### Planned (MVP Remaining)
 - [x] **Tick/ping system architecture** (designed, needs implementation)
 - [x] **Task definitions** (8 tasks designed, needs implementation)
 - [ ] Tick loop with action queue processing
@@ -684,12 +686,12 @@ These are explicitly NOT being implemented:
 - [ ] Flavor text system
 - [ ] Production maps (2 maps)
 
-### 📅 Post-MVP
+### Post-MVP
 - [ ] Ghost haunting
 - [ ] More sabotage types
 - [ ] More maps
 - [ ] Game settings
-- [ ] Vent visibility for crewmates (maybe)
+- [ ] Vent visibility for loyalists (maybe)
 
 ---
 
@@ -717,7 +719,7 @@ These are explicitly NOT being implemented:
 ## Technical Architecture
 
 ```
-among-us-ai/
+double-agent/
 ├── src/
 │   ├── server/
 │   │   └── index.ts          # Bun server, REST endpoints, SSE handler
@@ -727,7 +729,7 @@ among-us-ai/
 │   │   ├── rooms.ts          # RoomManager, room data and movement
 │   │   ├── tasks.ts          # TaskManager, task completion and win check
 │   │   ├── voting.ts         # VotingSystem, council and ejection
-│   │   └── imposter.ts       # ImposterAbilities, kill and sabotage
+│   │   └── mole.ts           # MoleAbilities, kill and sabotage
 │   ├── tick/
 │   │   ├── queue.ts          # ActionQueue management
 │   │   └── processor.ts      # Tick loop and action execution
@@ -755,7 +757,7 @@ among-us-ai/
 │   ├── tasks/                # Task implementation tests
 │   └── framework/            # Test utilities
 ├── docs/
-│   ├── notes/                # Reference notes (Among Us rules, libraries)
+│   ├── notes/                # Reference notes (game rules, libraries)
 │   └── plans/                # Planning documents (this file)
 └── package.json
 ```
@@ -775,11 +777,11 @@ among-us-ai/
 - **E2E Tests:** Full game flow from lobby to game end
 
 **Current Coverage:**
-- ✅ Task system (15 tests)
-- ✅ Room navigation (23 tests)
-- ✅ Voting system
-- ✅ Kill mechanics
-- ✅ Win conditions
+- Task system (15 tests)
+- Room navigation (23 tests)
+- Voting system
+- Kill mechanics
+- Win conditions
 
 ---
 
@@ -804,4 +806,4 @@ among-us-ai/
 
 ---
 
-*This plan is the source of truth for among-us-ai development. Update it as decisions change.*
+*This plan is the source of truth for double-agent development. Update it as decisions change.*
