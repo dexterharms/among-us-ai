@@ -5,6 +5,7 @@ import { LobbyManager } from '@/lobby/manager';
 import { Player, PlayerRole, PlayerStatus } from '@/types/game';
 import { RoomManager } from '@/game/rooms';
 import { TaskManager } from '@/game/tasks';
+import { logger } from '@/utils/logger';
 
 /**
  * Bun HTTP Server
@@ -86,7 +87,7 @@ export class GameServer {
               },
             });
           } catch (err) {
-            console.error('Error serving static file:', err);
+            logger.error('Error serving static file', { error: err });
             return new Response('Not Found', { status: 404, headers: corsHeaders });
           }
         }
@@ -158,7 +159,7 @@ export class GameServer {
             const player: Player = {
               id,
               name,
-              role: PlayerRole.CREWMATE,
+              role: PlayerRole.LOYALIST,
               status: PlayerStatus.ALIVE,
               location: {
                 roomId: startRoom?.id || 'cafeteria',
@@ -174,7 +175,7 @@ export class GameServer {
 
             return Response.json({ success: true, player, token }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error joining lobby:', err);
+            logger.error('Error joining lobby', { error: err });
             return Response.json(
               { error: 'Failed to join lobby' },
               { status: 500, headers: corsHeaders },
@@ -199,7 +200,7 @@ export class GameServer {
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error leaving lobby:', err);
+            logger.error('Error leaving lobby', { error: err });
             return Response.json(
               { error: 'Failed to leave lobby' },
               { status: 500, headers: corsHeaders },
@@ -224,7 +225,7 @@ export class GameServer {
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error setting ready status:', err);
+            logger.error('Error setting ready status', { error: err });
             return Response.json(
               { error: 'Failed to set ready status' },
               { status: 500, headers: corsHeaders },
@@ -261,7 +262,7 @@ export class GameServer {
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error starting game:', err);
+            logger.error('Error starting game', { error: err });
             return Response.json(
               { error: 'Failed to start game' },
               { status: 500, headers: corsHeaders },
@@ -289,7 +290,7 @@ export class GameServer {
 
             return Response.json({ success }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error moving player:', err);
+            logger.error('Error moving player', { error: err });
             return Response.json(
               { error: 'Failed to move player' },
               { status: 500, headers: corsHeaders },
@@ -317,7 +318,7 @@ export class GameServer {
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error casting vote:', err);
+            logger.error('Error casting vote', { error: err });
             return Response.json(
               { error: 'Failed to cast vote' },
               { status: 500, headers: corsHeaders },
@@ -342,7 +343,7 @@ export class GameServer {
 
             return Response.json(result, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error starting task:', err);
+            logger.error('Error starting task', { error: err });
             return Response.json(
               { error: 'Failed to start task' },
               { status: 500, headers: corsHeaders },
@@ -371,7 +372,7 @@ export class GameServer {
 
             return Response.json(result, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error submitting task action:', err);
+            logger.error('Error submitting task action', { error: err });
             return Response.json(
               { error: 'Failed to submit task action' },
               { status: 500, headers: corsHeaders },
@@ -400,7 +401,7 @@ export class GameServer {
 
             return Response.json(result, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error attempting task:', err);
+            logger.error('Error attempting task', { error: err });
             return Response.json(
               { error: 'Failed to attempt task' },
               { status: 500, headers: corsHeaders },
@@ -425,7 +426,7 @@ export class GameServer {
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error reporting body:', err);
+            logger.error('Error reporting body', { error: err });
             return Response.json(
               { error: 'Failed to report body' },
               { status: 500, headers: corsHeaders },
@@ -470,7 +471,7 @@ export class GameServer {
 
             return Response.json(result, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error fixing sabotage:', err);
+            logger.error('Error fixing sabotage', { error: err });
             return Response.json(
               { error: 'Failed to fix sabotage' },
               { status: 500, headers: corsHeaders },
@@ -518,7 +519,7 @@ export class GameServer {
 
             return Response.json(result, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error triggering sabotage:', err);
+            logger.error('Error triggering sabotage', { error: err });
             return Response.json(
               { error: 'Failed to trigger sabotage' },
               { status: 500, headers: corsHeaders },
@@ -543,7 +544,7 @@ export class GameServer {
 
             return Response.json(result, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error calling emergency:', err);
+            logger.error('Error calling emergency', { error: err });
             return Response.json(
               { error: 'Failed to call emergency meeting' },
               { status: 500, headers: corsHeaders },
@@ -567,11 +568,11 @@ export class GameServer {
               );
             }
 
-            this.gameState.getImposterAbilities().attemptVent(playerId, targetRoomId);
+            this.gameState.getMoleAbilities().attemptVent(playerId, targetRoomId);
 
             return Response.json({ success: true }, { headers: corsHeaders });
           } catch (err) {
-            console.error('Error venting:', err);
+            logger.error('Error venting', { error: err });
             return Response.json(
               { error: 'Failed to vent' },
               { status: 500, headers: corsHeaders },
@@ -588,7 +589,7 @@ export class GameServer {
     this.server = server;
     this.port = server.port ?? this.port;
 
-    console.log(`🚀 Game server started on http://${this.hostname}:${this.port}`);
+    logger.info(`Game server started on http://${this.hostname}:${this.port}`);
   }
 
   /**
@@ -670,7 +671,7 @@ export class GameServer {
       {
         id: 'p1',
         name: 'Alice',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: {
           roomId: rooms[0]?.id || 'room1',
@@ -682,7 +683,7 @@ export class GameServer {
       {
         id: 'p2',
         name: 'Bob',
-        role: PlayerRole.IMPOSTER,
+        role: PlayerRole.MOLE,
         status: PlayerStatus.ALIVE,
         location: {
           roomId: rooms[0]?.id || 'room1',
@@ -694,7 +695,7 @@ export class GameServer {
       {
         id: 'p3',
         name: 'Charlie',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: {
           roomId: rooms[0]?.id || 'room1',
@@ -707,6 +708,6 @@ export class GameServer {
 
     players.forEach((player) => this.gameState.addPlayer(player));
 
-    console.log(`🎮 Created demo game with ${players.length} players`);
+    logger.info(`Created demo game with ${players.length} players`);
   }
 }

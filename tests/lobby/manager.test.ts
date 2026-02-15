@@ -321,42 +321,42 @@ describe('LobbyManager', () => {
       lobbyManager.join(player3);
     });
 
-    test('should assign 1 imposter when players < 7', () => {
+    test('should assign 1 mole when players < 7', () => {
       const result = lobbyManager.assignRoles();
 
-      expect(result.imposters).toHaveLength(1);
-      expect(result.crewmates).toHaveLength(2);
+      expect(result.moles).toHaveLength(1);
+      expect(result.loyalists).toHaveLength(2);
     });
 
-    test('should assign 2 imposters when players >= 7', () => {
+    test('should assign 2 moles when players >= 7', () => {
       for (let i = 4; i <= 7; i++) {
         lobbyManager.join(createMockPlayer({ id: `player-${i}` }));
       }
 
       const result = lobbyManager.assignRoles();
 
-      expect(result.imposters).toHaveLength(2);
-      expect(result.crewmates).toHaveLength(5);
+      expect(result.moles).toHaveLength(2);
+      expect(result.loyalists).toHaveLength(5);
     });
 
     test('should set player roles correctly', () => {
       const result = lobbyManager.assignRoles();
 
-      result.imposters.forEach((id) => {
+      result.moles.forEach((id) => {
         const player = lobbyManager.getWaitingPlayers().find((p) => p.id === id);
-        expect(player?.role).toBe(PlayerRole.IMPOSTER);
+        expect(player?.role).toBe(PlayerRole.MOLE);
       });
 
-      result.crewmates.forEach((id) => {
+      result.loyalists.forEach((id) => {
         const player = lobbyManager.getWaitingPlayers().find((p) => p.id === id);
-        expect(player?.role).toBe(PlayerRole.CREWMATE);
+        expect(player?.role).toBe(PlayerRole.LOYALIST);
       });
     });
 
     test('should return all player IDs', () => {
       const result = lobbyManager.assignRoles();
 
-      const allIds = [...result.imposters, ...result.crewmates].sort();
+      const allIds = [...result.moles, ...result.loyalists].sort();
       const playerIds = lobbyManager.getWaitingPlayers().map((p) => p.id).sort();
 
       expect(allIds).toEqual(playerIds);
@@ -373,7 +373,7 @@ describe('LobbyManager', () => {
         lobby.join(player3);
 
         const result = lobby.assignRoles();
-        results.push([...result.imposters]);
+        results.push([...result.moles]);
       }
 
       // At least one variation should exist (not guaranteed but likely)

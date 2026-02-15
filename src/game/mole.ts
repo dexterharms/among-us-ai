@@ -3,7 +3,7 @@ import { GameState } from './state';
 import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
 
-export class ImposterAbilities {
+export class MoleAbilities {
   private killCooldowns: Map<string, number> = new Map();
   private readonly KILL_COOLDOWN = 30000; // 30 seconds in ms
   private ventCooldowns: Map<string, number> = new Map();
@@ -17,32 +17,32 @@ export class ImposterAbilities {
     this.sseManager = sseManager;
   }
 
-  attemptKill(imposterId: string, targetId: string): void {
-    const imposter = this.gameState.players.get(imposterId);
+  attemptKill(moleId: string, targetId: string): void {
+    const mole = this.gameState.players.get(moleId);
     const target = this.gameState.players.get(targetId);
 
-    if (!imposter || !target) {
+    if (!mole || !target) {
       logger.warn('Invalid kill attempt: Player not found', {
-        imposterId: imposterId,
+        moleId: moleId,
         targetId: targetId,
-        imposterExists: !!imposter,
+        moleExists: !!mole,
         targetExists: !!target,
       });
       return;
     }
 
-    if (!this.canKill(imposter, target)) {
+    if (!this.canKill(mole, target)) {
       logger.warn('Kill failed: Conditions not met', {
-        imposterId,
+        moleId,
         targetId,
-        imposterRole: imposter.role,
-        imposterStatus: imposter.status,
+        moleRole: mole.role,
+        moleStatus: mole.status,
         targetRole: target.role,
         targetStatus: target.status,
-        imposterRoom: imposter.location.roomId,
+        moleRoom: mole.location.roomId,
         targetRoom: target.location.roomId,
         phase: this.gameState.getPhase(),
-        cooldownRemaining: this.killCooldowns.get(imposterId) ? Math.max(0, this.killCooldowns.get(imposterId)! - Date.now()) : 0,
+        cooldownRemaining: this.killCooldowns.get(moleId) ? Math.max(0, this.killCooldowns.get(moleId)! - Date.now()) : 0,
       });
       return;
     }
@@ -60,11 +60,11 @@ export class ImposterAbilities {
     });
 
     // Set Cooldown
-    this.killCooldowns.set(imposterId, Date.now() + this.KILL_COOLDOWN);
+    this.killCooldowns.set(moleId, Date.now() + this.KILL_COOLDOWN);
 
     logger.logGameEvent('KillPerformed', {
-      imposterId,
-      imposterName: imposter.name,
+      moleId,
+      moleName: mole.name,
       targetId,
       targetName: target.name,
       targetRole: target.role,
@@ -76,7 +76,7 @@ export class ImposterAbilities {
     const youDiedEvent: GameEvent = {
       timestamp: Date.now(),
       type: EventType.YOU_DIED,
-      payload: { killerId: imposterId },
+      payload: { killerId: moleId },
     };
     this.sseManager.sendTo(targetId, youDiedEvent);
 
@@ -84,52 +84,52 @@ export class ImposterAbilities {
     this.checkWinCondition();
   }
 
-  canKill(imposter: Player, target: Player): boolean {
+  canKill(mole: Player, target: Player): boolean {
     // 1. Role check
-    if (imposter.role !== PlayerRole.IMPOSTER) return false;
-    if (target.role === PlayerRole.IMPOSTER) return false; // Can't kill other imposters
+    if (mole.role !== PlayerRole.MOLE) return false;
+    if (target.role === PlayerRole.MOLE) return false; // Can't kill other moles
 
     // 2. Status check
-    if (imposter.status !== PlayerStatus.ALIVE) return false;
+    if (mole.status !== PlayerStatus.ALIVE) return false;
     if (target.status !== PlayerStatus.ALIVE) return false;
 
     // 3. Phase check
     if (this.gameState.phase !== GamePhase.ROUND) return false;
 
     // 4. Location check (Same room)
-    if (imposter.location.roomId !== target.location.roomId) return false;
+    if (mole.location.roomId !== target.location.roomId) return false;
 
     // 5. Cooldown check
-    const cooldownEnd = this.killCooldowns.get(imposter.id) || 0;
+    const cooldownEnd = this.killCooldowns.get(mole.id) || 0;
     if (Date.now() < cooldownEnd) return false;
 
     return true;
   }
 
   checkWinCondition(): void {
-    const imposters = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.IMPOSTER && p.status === PlayerStatus.ALIVE,
+    const moles = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.MOLE && p.status === PlayerStatus.ALIVE,
     );
-    const crewmates = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.CREWMATE && p.status === PlayerStatus.ALIVE,
+    const loyalists = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.LOYALIST && p.status === PlayerStatus.ALIVE,
     );
 
-    logger.debug('Checking win condition (imposters)', {
-      livingImposters: imposters.length,
-      livingCrewmates: crewmates.length,
+    logger.debug('Checking win condition (moles)', {
+      livingMoles: moles.length,
+      livingLoyalists: loyalists.length,
       totalPlayers: this.gameState.players.size,
       roundNumber: this.gameState.getRoundNumber(),
     });
 
-    // Imposters win if 1:1 or better (Imposters >= Crewmates)
-    if (imposters.length >= crewmates.length) {
+    // Moles win if 1:1 or better (Moles >= Loyalists)
+    if (moles.length >= loyalists.length) {
       this.gameState.phase = GamePhase.GAME_OVER;
 
       logger.logGameEvent(EventType.GAME_ENDED, {
-        winner: 'Imposters',
-        reason: 'Imposters outnumber Crewmates',
-        livingImposters: imposters.length,
-        livingCrewmates: crewmates.length,
+        winner: 'Moles',
+        reason: 'Moles outnumber Loyalists',
+        livingMoles: moles.length,
+        livingLoyalists: loyalists.length,
         roundNumber: this.gameState.getRoundNumber(),
       });
 
@@ -137,21 +137,21 @@ export class ImposterAbilities {
         timestamp: Date.now(),
         type: EventType.GAME_ENDED,
         payload: {
-          winner: 'Imposters',
-          reason: 'Imposters outnumber Crewmates',
+          winner: 'Moles',
+          reason: 'Moles outnumber Loyalists',
         },
       };
       this.sseManager.broadcast(event);
     }
 
-    // Crewmates win if 0 imposters
-    if (imposters.length === 0) {
+    // Loyalists win if 0 moles
+    if (moles.length === 0) {
       this.gameState.phase = GamePhase.GAME_OVER;
 
       logger.logGameEvent(EventType.GAME_ENDED, {
-        winner: 'Crewmates',
-        reason: 'All imposters eliminated',
-        livingCrewmates: crewmates.length,
+        winner: 'Loyalists',
+        reason: 'All moles eliminated',
+        livingLoyalists: loyalists.length,
         roundNumber: this.gameState.getRoundNumber(),
       });
 
@@ -159,8 +159,8 @@ export class ImposterAbilities {
         timestamp: Date.now(),
         type: EventType.GAME_ENDED,
         payload: {
-          winner: 'Crewmates',
-          reason: 'All imposters eliminated',
+          winner: 'Loyalists',
+          reason: 'All moles eliminated',
         },
       };
       this.sseManager.broadcast(event);
@@ -168,10 +168,10 @@ export class ImposterAbilities {
   }
 
   /**
-   * Get remaining cooldown for an imposter
+   * Get remaining cooldown for a mole
    */
-  getCooldownRemaining(imposterId: string): number {
-    const cooldownEnd = this.killCooldowns.get(imposterId) || 0;
+  getCooldownRemaining(moleId: string): number {
+    const cooldownEnd = this.killCooldowns.get(moleId) || 0;
     return Math.max(0, cooldownEnd - Date.now());
   }
 
@@ -186,8 +186,8 @@ export class ImposterAbilities {
       return false;
     }
 
-    // 1. Role check - only imposters can use vents
-    if (player.role !== PlayerRole.IMPOSTER) {
+    // 1. Role check - only moles can use vents
+    if (player.role !== PlayerRole.MOLE) {
       return false;
     }
 
@@ -263,7 +263,7 @@ export class ImposterAbilities {
     // Store original room before updating location
     const fromRoomId = player.location.roomId;
 
-    // Perform vent travel
+    // Perform vent traveling
     player.location = {
       roomId: targetRoomId,
       x: targetRoom.position.x,

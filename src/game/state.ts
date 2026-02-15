@@ -21,7 +21,7 @@ import { TaskManager } from './tasks';
 import { SabotageSystem } from './sabotage';
 import { MinigameManager } from '@/tasks';
 import { EmergencyButtonSystem } from './emergency-button';
-import { ImposterAbilities } from './imposter';
+import { MoleAbilities } from './mole';
 import { PendingRevealQueue } from './pending-reveal-queue';
 
 export class GameState {
@@ -59,7 +59,7 @@ export class GameState {
   private minigameManager: MinigameManager;
   private roundStartTime: number = 0;
   private emergencyButtonSystem: EmergencyButtonSystem;
-  private imposterAbilities?: ImposterAbilities;
+  private moleAbilities?: MoleAbilities;
   private pendingRevealQueue: PendingRevealQueue;
   private currentMap: MapDefinition | null = null;
 
@@ -169,7 +169,7 @@ export class GameState {
     logger.logStateTransition(previousPhase, GamePhase.ROUND, {
       roundNumber: this.roundNumber,
       playerCount: this._players.size,
-      imposterCount: this.imposterCount,
+      moleCount: this.moleCount,
     });
 
     this.spawnPlayersInRandomRooms();
@@ -179,7 +179,7 @@ export class GameState {
       type: EventType.ROUND_STARTED,
       payload: {
         roundNumber: this.roundNumber,
-        imposterCount: this.imposterCount,
+        moleCount: this.moleCount,
       },
     };
     this.logAndBroadcast(event);
@@ -479,25 +479,25 @@ export class GameState {
   }
 
   /**
-   * Get the count of alive imposters
+   * Get the count of alive moles
    * Property getter for computed read-only value
    */
-  get imposterCount(): number {
+  get moleCount(): number {
     let count = 0;
     try {
       this._players.forEach((p, playerId) => {
         // Guard against null/undefined player
         if (!p) {
-          logger.warn(`Null/undefined player in imposterCount getter: ${playerId}`);
+          logger.warn(`Null/undefined player in moleCount getter: ${playerId}`);
           return;
         }
 
-        if (p.role === PlayerRole.IMPOSTER && p.status === PlayerStatus.ALIVE) {
+        if (p.role === PlayerRole.MOLE && p.status === PlayerStatus.ALIVE) {
           count++;
         }
       });
     } catch (error) {
-      logger.error('Error in imposterCount getter', {
+      logger.error('Error in moleCount getter', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -647,7 +647,7 @@ export class GameState {
   }
 
   /**
-   * Get sabotage system for imposter abilities
+   * Get sabotage system for mole abilities
    */
   getSabotageSystem(): SabotageSystem {
     return this.sabotageSystem;
@@ -667,11 +667,11 @@ export class GameState {
     return this.emergencyButtonSystem;
   }
 
-  getImposterAbilities(): ImposterAbilities {
-    if (!this.imposterAbilities) {
-      this.imposterAbilities = new ImposterAbilities(this, this.getSSEManager());
+  getMoleAbilities(): MoleAbilities {
+    if (!this.moleAbilities) {
+      this.moleAbilities = new MoleAbilities(this, this.getSSEManager());
     }
-    return this.imposterAbilities;
+    return this.moleAbilities;
   }
 
   getPendingRevealQueue(): PendingRevealQueue {

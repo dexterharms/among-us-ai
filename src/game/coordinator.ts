@@ -49,11 +49,11 @@ export class GameCoordinator {
     const selectedMap = this.mapLoader.selectRandom();
     this.gameState.loadMap(selectedMap);
 
-    // Assign roles (imposters vs crewmates)
-    const { imposters, crewmates } = this.lobbyManager.assignRoles();
+    // Assign roles (moles vs loyalists)
+    const { moles, loyalists } = this.lobbyManager.assignRoles();
 
     // Reveal roles to players
-    imposters.forEach((playerId) => {
+    moles.forEach((playerId) => {
       const player = players.find((p) => p.id === playerId);
       if (player) {
         const event: GameEvent = {
@@ -68,7 +68,7 @@ export class GameCoordinator {
       }
     });
 
-    crewmates.forEach((playerId) => {
+    loyalists.forEach((playerId) => {
       const player = players.find((p) => p.id === playerId);
       if (player) {
         const event: GameEvent = {
@@ -88,7 +88,7 @@ export class GameCoordinator {
       this.gameState.addPlayer(player);
     });
 
-    // Assign tasks to crewmates (HAR-32)
+    // Assign tasks to loyalists (HAR-32)
     this.gameState.getTaskManager().assignTasksToPlayers();
 
     // Start the first round
@@ -99,14 +99,14 @@ export class GameCoordinator {
       type: EventType.GAME_STARTED,
       payload: {
         playerCount: players.length,
-        imposterCount: imposters.length,
+        moleCount: moles.length,
       },
     };
     this.sseManager.broadcast(event);
 
     logger.info('Game started', {
       playerCount: players.length,
-      imposterCount: imposters.length,
+      moleCount: moles.length,
       mapId: selectedMap.id,
       mapName: selectedMap.name,
     });
@@ -139,7 +139,7 @@ export class GameCoordinator {
         timestamp: Date.now(),
         type: EventType.GAME_ENDED,
         payload: {
-          winner: 'Crewmates',
+          winner: 'Loyalists',
           reason: 'Game ended',
         },
       };

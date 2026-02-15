@@ -1,21 +1,21 @@
-# Work on Among Us AI
+# Work on Double Agent
 
-Execute one complete implementation cycle for the among-us-ai project, from task selection through PR creation.
+Execute one complete implementation cycle for the Double Agent project, from task selection through PR creation.
 
 ## Context
 
 | Resource | Path |
 |----------|------|
-| Codebase | `~/.dexter/projects/among-us-ai/` |
-| Documentation | `~/.dexter/projects/among-us-ai/docs/` |
-| Master Plan | `~/.dexter/projects/among-us-ai/docs/plans/among-us-ai.plan.md` |
-| Linear Project | `among-us-ai` |
+| Codebase | `~/.dexter/projects/double-agent/` |
+| Documentation | `~/.dexter/projects/double-agent/docs/` |
+| Master Plan | `~/.dexter/projects/double-agent/docs/plans/double-agent.plan.md` |
+| Linear Project | `double-agent` |
 
 ## Execution
 
 ### 1. Task Selection
 
-Query Linear for issues in the `among-us-ai` project. Select the highest-priority task that is:
+Query Linear for issues in the `double-agent` project. Select the highest-priority task that is:
 - Not already assigned or in progress
 - Within current sprint scope (if applicable)
 
@@ -31,7 +31,7 @@ Before writing any code, compare current codebase state against the Master Plan 
 Execute the `dev-cycle` skill with these project-specific bindings:
 
 ```
-Branch: among-us-ai/<issue-id>-<short-description>
+Branch: double-agent/<issue-id>-<short-description>
 Base: main
 Test strategy: Use `coding-agents` skill for TDD workflow
 Validation: Run Diffray locally before PR

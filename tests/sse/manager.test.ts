@@ -40,7 +40,7 @@ describe('SSEManager with Authentication', () => {
     const event: GameEvent = {
       timestamp: Date.now(),
       type: EventType.ROLE_REVEALED,
-      payload: { playerId: 'player-1', role: 'CREWMATE' },
+      payload: { playerId: 'player-1', role: 'LOYALIST' },
     };
 
     const result = await sseManager.sendTo('non-existent-player', event);

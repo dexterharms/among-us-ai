@@ -3,8 +3,8 @@
  */
 
 export const PlayerRole = {
-  CREWMATE: 'Crewmate',
-  IMPOSTER: 'Imposter',
+  LOYALIST: 'Loyalist',
+  MOLE: 'Mole',
 } as const;
 
 export type PlayerRole = (typeof PlayerRole)[keyof typeof PlayerRole];
@@ -51,13 +51,20 @@ export const GamePhase = {
 
 export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
 
+export interface Room {
+  id: string;
+  name: string;
+  exits: string[];
+  position: { x: number; y: number };
+}
+
 export interface GameState {
   id?: string;
   phase: GamePhase;
   roundNumber: number;
-  imposterCount: number;
+  moleCount: number;
   roundTimer: number;
   deadBodies: DeadBody[];
   players: Player[] | Map<string, Player>;
-  rooms: any[] | Map<string, any>;
+  rooms: Room[] | Map<string, Room>;
 }

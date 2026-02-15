@@ -14,8 +14,8 @@ import { TEST_MAP } from '@/game/maps';
 describe('TaskManager', () => {
   let gameState: GameState;
   let taskManager: TaskManager;
-  let crewmates: Player[];
-  let imposter: Player;
+  let loyalists: Player[];
+  let mole: Player;
   // Use real task IDs from MAP0_TASKS
   const TASK_IDS = [
     'sequence-repetition-cafeteria',
@@ -60,38 +60,38 @@ describe('TaskManager', () => {
       }
     });
 
-    // Create players: 1 imposter, 3 crewmates
-    imposter = createMockPlayer({
-      id: 'imposter-1',
-      name: 'The Imposter',
-      role: PlayerRole.IMPOSTER,
+    // Create players: 1 mole, 3 loyalists
+    mole = createMockPlayer({
+      id: 'mole-1',
+      name: 'The Mole',
+      role: PlayerRole.MOLE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'center', x: 0, y: 0 },
     });
 
-    crewmates = [
+    loyalists = [
       createMockPlayer({
-        id: 'crewmate-1',
-        name: 'Crewmate 1',
-        role: PlayerRole.CREWMATE,
+        id: 'loyalist-1',
+        name: 'Loyalist 1',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 10, y: 10 },
         tasks: [],
         taskProgress: 0,
       }),
       createMockPlayer({
-        id: 'crewmate-2',
-        name: 'Crewmate 2',
-        role: PlayerRole.CREWMATE,
+        id: 'loyalist-2',
+        name: 'Loyalist 2',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'electrical-room', x: 20, y: 20 },
         tasks: [],
         taskProgress: 0,
       }),
       createMockPlayer({
-        id: 'crewmate-3',
-        name: 'Crewmate 3',
-        role: PlayerRole.CREWMATE,
+        id: 'loyalist-3',
+        name: 'Loyalist 3',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'logs-room', x: 30, y: 30 },
         tasks: [],
@@ -100,8 +100,8 @@ describe('TaskManager', () => {
     ];
 
     // Add players to game state
-    gameState.addPlayer(imposter);
-    crewmates.forEach((player) => gameState.addPlayer(player));
+    gameState.addPlayer(mole);
+    loyalists.forEach((player) => gameState.addPlayer(player));
 
     // Set game to ROUND phase
     gameState.setPhase(GamePhase.ROUND);
@@ -112,174 +112,174 @@ describe('TaskManager', () => {
   });
 
   describe('attemptTask', () => {
-    test('should successfully complete a task for a living crewmate', () => {
+    test('should successfully complete a task for a living loyalist', () => {
       // Pass empty action to simulate successful minigame completion
       // The minigame manager will handle the completion logic
-      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
+      const result: TaskResult = taskManager.attemptTask('loyalist-1', 'task-1', true);
 
       expect(result.success).toBe(true);
-      expect(crewmates[0].tasks).toContain('task-1');
+      expect(loyalists[0].tasks).toContain('task-1');
     });
 
-    test('should not allow imposter to complete tasks', () => {
-      const result: TaskResult = taskManager.attemptTask('imposter-1', 'task-1', true);
+    test('should not allow mole to complete tasks', () => {
+      const result: TaskResult = taskManager.attemptTask('mole-1', 'task-1', true);
 
       expect(result.success).toBe(false);
-      expect(result.reason).toBe('Only crewmates can complete tasks');
+      expect(result.reason).toBe('Only loyalists can complete tasks');
     });
 
-    test('should not allow dead crewmate to complete tasks', () => {
-      crewmates[0].status = PlayerStatus.DEAD;
+    test('should not allow dead loyalist to complete tasks', () => {
+      loyalists[0].status = PlayerStatus.DEAD;
 
-      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
+      const result: TaskResult = taskManager.attemptTask('loyalist-1', 'task-1', true);
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Player is not alive');
     });
 
     test('should not complete same task twice for same player', () => {
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
+      taskManager.attemptTask('loyalist-1', 'task-1', true);
 
-      const result: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
+      const result: TaskResult = taskManager.attemptTask('loyalist-1', 'task-1', true);
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Task already completed by this player');
     });
 
     test('should allow different players to complete same task', () => {
-      const result1: TaskResult = taskManager.attemptTask('crewmate-1', 'task-1', true);
-      const result2: TaskResult = taskManager.attemptTask('crewmate-2', 'task-1', true);
+      const result1: TaskResult = taskManager.attemptTask('loyalist-1', 'task-1', true);
+      const result2: TaskResult = taskManager.attemptTask('loyalist-2', 'task-1', true);
 
       expect(result1.success).toBe(true);
       expect(result2.success).toBe(true);
-      expect(crewmates[0].tasks).toContain('task-1');
-      expect(crewmates[1].tasks).toContain('task-1');
+      expect(loyalists[0].tasks).toContain('task-1');
+      expect(loyalists[1].tasks).toContain('task-1');
     });
   });
 
-  describe('getCompletedTaskCount - Living Crewmates Only', () => {
-    test('should count tasks from living crewmates only', () => {
-      // Complete 2 tasks for crewmate-1
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
+  describe('getCompletedTaskCount - Living Loyalists Only', () => {
+    test('should count tasks from living loyalists only', () => {
+      // Complete 2 tasks for loyalist-1
+      taskManager.attemptTask('loyalist-1', 'task-1', true);
+      taskManager.attemptTask('loyalist-1', 'task-2', true);
 
-      // Complete 1 task for crewmate-2
-      taskManager.attemptTask('crewmate-2', 'task-1', true);
+      // Complete 1 task for loyalist-2
+      taskManager.attemptTask('loyalist-2', 'task-1', true);
 
-      // Kill crewmate-3 (no tasks completed anyway)
-      crewmates[2].status = PlayerStatus.DEAD;
+      // Kill loyalist-3 (no tasks completed anyway)
+      loyalists[2].status = PlayerStatus.DEAD;
 
       const count = taskManager.getCompletedTaskCount();
 
-      // Only living crewmates' tasks should count
+      // Only living loyalists' tasks should count
       expect(count).toBe(3);
     });
 
-    test('should not count tasks from dead crewmates', () => {
-      // Complete 3 tasks for crewmate-1
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
+    test('should not count tasks from dead loyalists', () => {
+      // Complete 3 tasks for loyalist-1
+      taskManager.attemptTask('loyalist-1', 'task-1', true);
+      taskManager.attemptTask('loyalist-1', 'task-2', true);
+      taskManager.attemptTask('loyalist-1', 'task-3', true);
 
-      // Complete 2 tasks for crewmate-2
-      taskManager.attemptTask('crewmate-2', 'task-1', true);
-      taskManager.attemptTask('crewmate-2', 'task-2', true);
+      // Complete 2 tasks for loyalist-2
+      taskManager.attemptTask('loyalist-2', 'task-1', true);
+      taskManager.attemptTask('loyalist-2', 'task-2', true);
 
-      // Now kill crewmate-2 - their tasks shouldn't count
-      crewmates[1].status = PlayerStatus.DEAD;
+      // Now kill loyalist-2 - their tasks shouldn't count
+      loyalists[1].status = PlayerStatus.DEAD;
 
       const count = taskManager.getCompletedTaskCount();
 
-      // Only crewmate-1's tasks count (they're alive)
+      // Only loyalist-1's tasks count (they're alive)
       expect(count).toBe(3);
     });
   });
 
-  describe('checkTaskWinCondition - Crewmate Win', () => {
-    test('should trigger crewmate win when all living crewmates complete all tasks', () => {
-      // All 3 living crewmates complete all 3 tasks
-      crewmates.forEach((crewmate) => {
-        taskManager.attemptTask(crewmate.id, 'task-1', true);
-        taskManager.attemptTask(crewmate.id, 'task-2', true);
-        taskManager.attemptTask(crewmate.id, 'task-3', true);
+  describe('checkTaskWinCondition - Loyalist Win', () => {
+    test('should trigger loyalist win when all living loyalists complete all tasks', () => {
+      // All 3 living loyalists complete all 3 tasks
+      loyalists.forEach((loyalist) => {
+        taskManager.attemptTask(loyalist.id, 'task-1', true);
+        taskManager.attemptTask(loyalist.id, 'task-2', true);
+        taskManager.attemptTask(loyalist.id, 'task-3', true);
       });
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
-    test('should trigger crewmate win even if some crewmates are dead', () => {
-      // Kill crewmate-3
-      crewmates[2].status = PlayerStatus.DEAD;
+    test('should trigger loyalist win even if some loyalists are dead', () => {
+      // Kill loyalist-3
+      loyalists[2].status = PlayerStatus.DEAD;
 
-      // Remaining 2 living crewmates complete all tasks
-      crewmates.slice(0, 2).forEach((crewmate) => {
-        taskManager.attemptTask(crewmate.id, 'task-1', true);
-        taskManager.attemptTask(crewmate.id, 'task-2', true);
-        taskManager.attemptTask(crewmate.id, 'task-3', true);
+      // Remaining 2 living loyalists complete all tasks
+      loyalists.slice(0, 2).forEach((loyalist) => {
+        taskManager.attemptTask(loyalist.id, 'task-1', true);
+        taskManager.attemptTask(loyalist.id, 'task-2', true);
+        taskManager.attemptTask(loyalist.id, 'task-3', true);
       });
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
-    test('should NOT trigger win if dead crewmate had completed tasks but living have not', () => {
-      // Crewmate-3 completes all tasks
-      taskManager.attemptTask('crewmate-3', 'task-1', true);
-      taskManager.attemptTask('crewmate-3', 'task-2', true);
-      taskManager.attemptTask('crewmate-3', 'task-3', true);
+    test('should NOT trigger win if dead loyalist had completed tasks but living have not', () => {
+      // Loyalist-3 completes all tasks
+      taskManager.attemptTask('loyalist-3', 'task-1', true);
+      taskManager.attemptTask('loyalist-3', 'task-2', true);
+      taskManager.attemptTask('loyalist-3', 'task-3', true);
 
-      // Now kill crewmate-3
-      crewmates[2].status = PlayerStatus.DEAD;
+      // Now kill loyalist-3
+      loyalists[2].status = PlayerStatus.DEAD;
 
-      // Living crewmates have not completed all tasks
+      // Living loyalists have not completed all tasks
       // Win should NOT trigger
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
     });
 
-    test('should trigger win when living crewmates complete tasks after death of another', () => {
-      // Kill crewmate-3 first (no tasks)
-      crewmates[2].status = PlayerStatus.DEAD;
+    test('should trigger win when living loyalists complete tasks after death of another', () => {
+      // Kill loyalist-3 first (no tasks)
+      loyalists[2].status = PlayerStatus.DEAD;
 
-      // Remaining 2 living crewmates complete all tasks
-      crewmates.slice(0, 2).forEach((crewmate) => {
-        taskManager.attemptTask(crewmate.id, 'task-1', true);
-        taskManager.attemptTask(crewmate.id, 'task-2', true);
-        taskManager.attemptTask(crewmate.id, 'task-3', true);
+      // Remaining 2 living loyalists complete all tasks
+      loyalists.slice(0, 2).forEach((loyalist) => {
+        taskManager.attemptTask(loyalist.id, 'task-1', true);
+        taskManager.attemptTask(loyalist.id, 'task-2', true);
+        taskManager.attemptTask(loyalist.id, 'task-3', true);
       });
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
-    test('should adjust total tasks when crewmate dies mid-progress', () => {
-      // 2 crewmates complete 2/3 tasks each
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-2', 'task-1', true);
-      taskManager.attemptTask('crewmate-2', 'task-2', true);
+    test('should adjust total tasks when loyalist dies mid-progress', () => {
+      // 2 loyalists complete 2/3 tasks each
+      taskManager.attemptTask('loyalist-1', 'task-1', true);
+      taskManager.attemptTask('loyalist-1', 'task-2', true);
+      taskManager.attemptTask('loyalist-2', 'task-1', true);
+      taskManager.attemptTask('loyalist-2', 'task-2', true);
 
       // No win yet
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
 
-      // Kill crewmate-3 (they hadn't done any tasks)
-      crewmates[2].status = PlayerStatus.DEAD;
+      // Kill loyalist-3 (they hadn't done any tasks)
+      loyalists[2].status = PlayerStatus.DEAD;
 
-      // Still no win - 2 living crewmates need to complete all 3 tasks
+      // Still no win - 2 living loyalists need to complete all 3 tasks
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
 
-      // Complete last task for both living crewmates
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
-      taskManager.attemptTask('crewmate-2', 'task-3', true);
+      // Complete last task for both living loyalists
+      taskManager.attemptTask('loyalist-1', 'task-3', true);
+      taskManager.attemptTask('loyalist-2', 'task-3', true);
 
       // Now win should trigger
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
-    test('should not trigger win when only some living crewmates have completed tasks', () => {
-      // Only crewmate-1 completes all tasks
-      taskManager.attemptTask('crewmate-1', 'task-1', true);
-      taskManager.attemptTask('crewmate-1', 'task-2', true);
-      taskManager.attemptTask('crewmate-1', 'task-3', true);
+    test('should not trigger win when only some living loyalists have completed tasks', () => {
+      // Only loyalist-1 completes all tasks
+      taskManager.attemptTask('loyalist-1', 'task-1', true);
+      taskManager.attemptTask('loyalist-1', 'task-2', true);
+      taskManager.attemptTask('loyalist-1', 'task-3', true);
 
-      // Other 2 crewmates haven't - no win
+      // Other 2 loyalists haven't - no win
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
     });
   });

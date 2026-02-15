@@ -8,9 +8,9 @@ describe('SabotageSystem', () => {
   let gameState: GameState;
   let sseManager: SSEManager;
   let sabotageSystem: SabotageSystem;
-  let imposter: any;
-  let crewmate: any;
-  let crewmate2: any;
+  let mole: any;
+  let loyalist: any;
+  let loyalist2: any;
 
   beforeEach(() => {
     gameState = new GameState();
@@ -23,36 +23,36 @@ describe('SabotageSystem', () => {
     sabotageSystem = new SabotageSystem(gameState, sseManager);
 
     // Create test players
-    imposter = {
-      id: 'imposter-1',
-      name: 'Imposter One',
-      role: PlayerRole.IMPOSTER,
+    mole = {
+      id: 'mole-1',
+      name: 'Mole One',
+      role: PlayerRole.MOLE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-0', x: 0, y: 0 },
       tasks: [],
     };
 
-    crewmate = {
-      id: 'crewmate-1',
-      name: 'Crewmate One',
-      role: PlayerRole.CREWMATE,
+    loyalist = {
+      id: 'loyalist-1',
+      name: 'Loyalist One',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-0', x: 0, y: 0 },
       tasks: [],
     };
 
-    crewmate2 = {
-      id: 'crewmate-2',
-      name: 'Crewmate Two',
-      role: PlayerRole.CREWMATE,
+    loyalist2 = {
+      id: 'loyalist-2',
+      name: 'Loyalist Two',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-1', x: 0, y: 0 },
       tasks: [],
     };
 
-    gameState.addPlayer(imposter);
-    gameState.addPlayer(crewmate);
-    gameState.addPlayer(crewmate2);
+    gameState.addPlayer(mole);
+    gameState.addPlayer(loyalist);
+    gameState.addPlayer(loyalist2);
   });
 
   afterEach(() => {
@@ -76,38 +76,38 @@ describe('SabotageSystem', () => {
       gameState.phase = GamePhase.ROUND;
 
       // First sabotage should succeed
-      const result1 = freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      const result1 = freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       expect(result1.success).toBe(true);
 
       // Immediate second sabotage should fail due to cooldown
-      const result2 = freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      const result2 = freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       expect(result2.success).toBe(false);
       expect(result2.reason).toContain('Sabotage on cooldown');
 
       freshSystem.cleanup();
     });
 
-    it('should reject sabotage from crewmate', () => {
+    it('should reject sabotage from loyalist', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
-      const result = freshSystem.attemptSabotage('crewmate-1', SabotageType.LIGHTS);
+      const result = freshSystem.attemptSabotage('loyalist-1', SabotageType.LIGHTS);
 
       expect(result.success).toBe(false);
-      expect(result.reason).toBe('Only imposters can sabotage');
+      expect(result.reason).toBe('Only moles can sabotage');
 
       freshSystem.cleanup();
     });
 
-    it('should reject sabotage from dead imposter', () => {
+    it('should reject sabotage from dead mole', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
-      imposter.status = PlayerStatus.DEAD;
+      mole.status = PlayerStatus.DEAD;
 
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       expect(result.success).toBe(false);
-      expect(result.reason).toBe('Dead imposters cannot sabotage');
+      expect(result.reason).toBe('Dead moles cannot sabotage');
 
       // Reset status
-      imposter.status = PlayerStatus.ALIVE;
+      mole.status = PlayerStatus.ALIVE;
       freshSystem.cleanup();
     });
 
@@ -115,7 +115,7 @@ describe('SabotageSystem', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.LOBBY;
 
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Can only sabotage during round phase');
@@ -128,14 +128,14 @@ describe('SabotageSystem', () => {
       gameState.phase = GamePhase.ROUND;
 
       // First sabotage
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       // Set cooldown to a past time (simulating time passing beyond 60s cooldown)
       const cooldowns = (freshSystem as any).sabotageCooldowns;
-      cooldowns.set('imposter-1', Date.now() - 61000); // 61 seconds ago (beyond 60s cooldown)
+      cooldowns.set('mole-1', Date.now() - 61000); // 61 seconds ago (beyond 60s cooldown)
 
       // Should succeed with a DIFFERENT sabotage type (same type would fail because already active)
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-0');
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-0');
       expect(result.success).toBe(true);
 
       freshSystem.cleanup();
@@ -145,7 +145,7 @@ describe('SabotageSystem', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
 
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS);
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.DOORS);
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Doors sabotage requires target room ID');
@@ -159,13 +159,13 @@ describe('SabotageSystem', () => {
       gameState.phase = GamePhase.ROUND;
 
       // First sabotage
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       // Clear cooldown so we can test duplicate detection
-      (freshSystem as any).sabotageCooldowns.delete('imposter-1');
+      (freshSystem as any).sabotageCooldowns.delete('mole-1');
 
       // Second sabotage of same type should fail
-      const result2 = freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      const result2 = freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       expect(result2.success).toBe(false);
       expect(result2.reason).toContain('already active');
 
@@ -178,13 +178,13 @@ describe('SabotageSystem', () => {
       gameState.phase = GamePhase.ROUND;
 
       // First sabotage
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       // Clear cooldown
-      (freshSystem as any).sabotageCooldowns.delete('imposter-1');
+      (freshSystem as any).sabotageCooldowns.delete('mole-1');
 
       // Second sabotage of different type should succeed
-      const result2 = freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-0');
+      const result2 = freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-0');
       expect(result2.success).toBe(true);
 
       freshSystem.cleanup();
@@ -196,7 +196,7 @@ describe('SabotageSystem', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
 
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       expect(result.success).toBe(true);
       expect(sseManager.broadcast).toHaveBeenCalled();
@@ -208,7 +208,7 @@ describe('SabotageSystem', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
 
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-0');
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-0');
 
       expect(result.success).toBe(true);
       expect(sseManager.broadcast).toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe('SabotageSystem', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
 
-      const result = freshSystem.attemptSabotage('imposter-1', SabotageType.SELF_DESTRUCT);
+      const result = freshSystem.attemptSabotage('mole-1', SabotageType.SELF_DESTRUCT);
 
       expect(result.success).toBe(true);
       expect(sseManager.broadcast).toHaveBeenCalled();
@@ -231,7 +231,7 @@ describe('SabotageSystem', () => {
     it('should broadcast sabotage activation event', () => {
       gameState.phase = GamePhase.ROUND;
 
-      sabotageSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      sabotageSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       expect(sseManager.broadcast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -247,9 +247,9 @@ describe('SabotageSystem', () => {
 
     it('should broadcast sabotage triggered event to all players', () => {
       gameState.phase = GamePhase.ROUND;
-      crewmate.tasks = ['task-1'];
+      loyalist.tasks = ['task-1'];
 
-      sabotageSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      sabotageSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       // The sabotage event is broadcast to all players
       expect(sseManager.broadcast).toHaveBeenCalledWith(
@@ -274,26 +274,26 @@ describe('SabotageSystem', () => {
       freshSystem.cleanup();
     });
 
-    it('should reject fix from imposter', () => {
+    it('should reject fix from mole', () => {
       // First, create a sabotage
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages[0]?.id;
 
-      // Try to fix as imposter
-      const result = freshSystem.attemptFix('imposter-1', sabotageId);
+      // Try to fix as mole
+      const result = freshSystem.attemptFix('mole-1', sabotageId);
 
       expect(result.success).toBe(false);
-      expect(result.reason).toBe('Only crewmates can fix sabotages');
+      expect(result.reason).toBe('Only loyalists can fix sabotages');
 
       freshSystem.cleanup();
     });
 
     it('should reject fix for non-existent sabotage', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
-      const result = freshSystem.attemptFix('crewmate-1', 'non-existent');
+      const result = freshSystem.attemptFix('loyalist-1', 'non-existent');
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Sabotage not found or not active');
@@ -301,39 +301,39 @@ describe('SabotageSystem', () => {
       freshSystem.cleanup();
     });
 
-    it('should reject fix from dead crewmate', () => {
+    it('should reject fix from dead loyalist', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       // Create sabotage
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages[0]?.id;
 
-      crewmate.status = PlayerStatus.DEAD;
+      loyalist.status = PlayerStatus.DEAD;
 
-      const result = freshSystem.attemptFix('crewmate-1', sabotageId);
+      const result = freshSystem.attemptFix('loyalist-1', sabotageId);
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Dead players cannot fix sabotages');
 
       // Reset status
-      crewmate.status = PlayerStatus.ALIVE;
+      loyalist.status = PlayerStatus.ALIVE;
       freshSystem.cleanup();
     });
 
     it('should reject fix attempt after sabotage is already fixed', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages[0]?.id;
 
       // First fix - should succeed and end the sabotage
-      const result1 = freshSystem.attemptFix('crewmate-1', sabotageId);
+      const result1 = freshSystem.attemptFix('loyalist-1', sabotageId);
       expect(result1.success).toBe(true);
 
       // Second fix from same player should fail - sabotage no longer exists
-      const result2 = freshSystem.attemptFix('crewmate-1', sabotageId);
+      const result2 = freshSystem.attemptFix('loyalist-1', sabotageId);
       expect(result2.success).toBe(false);
       expect(result2.reason).toContain('not found or not active');
 
@@ -343,12 +343,12 @@ describe('SabotageSystem', () => {
     it('should require player to be in affected room for doors sabotage', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-1');
+      freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-1');
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages.find((s) => s.type === 'doors')?.id;
 
-      // Crewmate is in room-0, but sabotage is in room-1
-      const result = freshSystem.attemptFix('crewmate-1', sabotageId);
+      // Loyalist is in room-0, but sabotage is in room-1
+      const result = freshSystem.attemptFix('loyalist-1', sabotageId);
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('You must be in the affected room to fix this');
@@ -359,26 +359,26 @@ describe('SabotageSystem', () => {
     it('should allow fix when player is in affected room', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-0');
+      freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-0');
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages.find((s) => s.type === 'doors')?.id;
 
-      // Crewmate is in room-0, sabotage is in room-0
-      const result = freshSystem.attemptFix('crewmate-1', sabotageId);
+      // Loyalist is in room-0, sabotage is in room-0
+      const result = freshSystem.attemptFix('loyalist-1', sabotageId);
 
       expect(result.success).toBe(true);
 
       freshSystem.cleanup();
     });
 
-    it('should fix lights sabotage with any crewmate', () => {
+    it('should fix lights sabotage with any loyalist', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages[0]?.id;
 
-      const result = freshSystem.attemptFix('crewmate-1', sabotageId);
+      const result = freshSystem.attemptFix('loyalist-1', sabotageId);
 
       expect(result.success).toBe(true);
       expect(result.reason).toBe('Sabotage fixed!');
@@ -386,20 +386,20 @@ describe('SabotageSystem', () => {
       freshSystem.cleanup();
     });
 
-    it('should require 2 crewmates to fix self-destruct', () => {
+    it('should require 2 loyalists to fix self-destruct', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.SELF_DESTRUCT);
+      freshSystem.attemptSabotage('mole-1', SabotageType.SELF_DESTRUCT);
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages[0]?.id;
 
       // First fix
-      const result1 = freshSystem.attemptFix('crewmate-1', sabotageId);
+      const result1 = freshSystem.attemptFix('loyalist-1', sabotageId);
       expect(result1.success).toBe(true);
       expect(result1.reason).toBe('Fix contribution recorded');
 
-      // Second fix from different crewmate
-      const result2 = freshSystem.attemptFix('crewmate-2', sabotageId);
+      // Second fix from different loyalist
+      const result2 = freshSystem.attemptFix('loyalist-2', sabotageId);
       expect(result2.success).toBe(true);
       expect(result2.reason).toBe('Sabotage fixed!');
 
@@ -409,11 +409,11 @@ describe('SabotageSystem', () => {
     it('should broadcast sabotage resolved event on fix', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
       const activeSabotages = freshSystem.getActiveSabotages();
       const sabotageId = activeSabotages[0]?.id;
 
-      freshSystem.attemptFix('crewmate-1', sabotageId);
+      freshSystem.attemptFix('loyalist-1', sabotageId);
 
       expect(sseManager.broadcast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -432,7 +432,7 @@ describe('SabotageSystem', () => {
     it('should return true when doors sabotage is active for room', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-1');
+      freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-1');
 
       const blocked = freshSystem.isMovementBlocked('room-1');
 
@@ -450,7 +450,7 @@ describe('SabotageSystem', () => {
     it('should return false for different room', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.DOORS, 'room-1');
+      freshSystem.attemptSabotage('mole-1', SabotageType.DOORS, 'room-1');
 
       const blocked = freshSystem.isMovementBlocked('room-0');
 
@@ -464,9 +464,9 @@ describe('SabotageSystem', () => {
     it('should return remaining cooldown time', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
-      const remaining = freshSystem.getCooldownRemaining('imposter-1');
+      const remaining = freshSystem.getCooldownRemaining('mole-1');
 
       expect(remaining).toBeGreaterThan(0);
       expect(remaining).toBeLessThanOrEqual(60000);
@@ -476,7 +476,7 @@ describe('SabotageSystem', () => {
 
     it('should return 0 when no cooldown', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
-      const remaining = freshSystem.getCooldownRemaining('imposter-1');
+      const remaining = freshSystem.getCooldownRemaining('mole-1');
 
       expect(remaining).toBe(0);
 
@@ -497,7 +497,7 @@ describe('SabotageSystem', () => {
     it('should return active sabotages', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       const active = freshSystem.getActiveSabotages();
 
@@ -513,14 +513,14 @@ describe('SabotageSystem', () => {
     it('should clear all sabotages and cooldowns', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       freshSystem.cleanup();
 
       const active = freshSystem.getActiveSabotages();
       expect(active).toEqual([]);
 
-      const cooldown = freshSystem.getCooldownRemaining('imposter-1');
+      const cooldown = freshSystem.getCooldownRemaining('mole-1');
       expect(cooldown).toBe(0);
     });
   });
@@ -529,14 +529,14 @@ describe('SabotageSystem', () => {
     it('should clear all sabotages and cooldowns', () => {
       const freshSystem = new SabotageSystem(gameState, sseManager);
       gameState.phase = GamePhase.ROUND;
-      freshSystem.attemptSabotage('imposter-1', SabotageType.LIGHTS);
+      freshSystem.attemptSabotage('mole-1', SabotageType.LIGHTS);
 
       freshSystem.reset();
 
       const active = freshSystem.getActiveSabotages();
       expect(active).toEqual([]);
 
-      const cooldown = freshSystem.getCooldownRemaining('imposter-1');
+      const cooldown = freshSystem.getCooldownRemaining('mole-1');
       expect(cooldown).toBe(0);
     });
   });

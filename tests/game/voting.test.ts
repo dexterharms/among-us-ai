@@ -14,61 +14,61 @@ describe('VotingSystem', () => {
   let gameState: GameState;
   let votingSystem: VotingSystem;
   let players: Player[];
-  let imposter: Player;
-  let crewmates: Player[];
+  let mole: Player;
+  let loyalists: Player[];
 
   beforeEach(() => {
     gameState = new GameState();
     votingSystem = new VotingSystem(gameState, gameState.getSSEManager());
 
-    // Create players: 1 imposter, 5 crewmates
-    imposter = createMockPlayer({
+    // Create players: 1 mole, 5 loyalists
+    mole = createMockPlayer({
       id: 'player-1',
-      name: 'The Imposter',
-      role: PlayerRole.IMPOSTER,
+      name: 'The Mole',
+      role: PlayerRole.MOLE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'center', x: 0, y: 0 },
     });
 
-    crewmates = [
+    loyalists = [
       createMockPlayer({
         id: 'player-2',
-        name: 'Crewmate 2',
-        role: PlayerRole.CREWMATE,
+        name: 'Loyalist 2',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 10, y: 10 },
       }),
       createMockPlayer({
         id: 'player-3',
-        name: 'Crewmate 3',
-        role: PlayerRole.CREWMATE,
+        name: 'Loyalist 3',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 20, y: 20 },
       }),
       createMockPlayer({
         id: 'player-4',
-        name: 'Crewmate 4',
-        role: PlayerRole.CREWMATE,
+        name: 'Loyalist 4',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 30, y: 30 },
       }),
       createMockPlayer({
         id: 'player-5',
-        name: 'Crewmate 5',
-        role: PlayerRole.CREWMATE,
+        name: 'Loyalist 5',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 40, y: 40 },
       }),
       createMockPlayer({
         id: 'player-6',
-        name: 'Crewmate 6',
-        role: PlayerRole.CREWMATE,
+        name: 'Loyalist 6',
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 50, y: 50 },
       }),
     ];
 
-    players = [imposter, ...crewmates];
+    players = [mole, ...loyalists];
     players.forEach((player) => gameState.addPlayer(player));
   });
 
@@ -257,22 +257,22 @@ describe('VotingSystem', () => {
       votingSystem.startCouncil(deadBodies);
     });
 
-    test('should trigger crewmates win when all imposters ejected', () => {
-      votingSystem.ejectPlayer('player-1'); // Eject imposter
+    test('should trigger loyalists win when all moles ejected', () => {
+      votingSystem.ejectPlayer('player-1'); // Eject mole
       votingSystem['checkWinCondition'](); // Explicitly check win condition
 
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
-    test('should not trigger crewmates win if imposters remain', () => {
-      votingSystem.ejectPlayer('player-2'); // Eject crewmate
+    test('should not trigger loyalists win if moles remain', () => {
+      votingSystem.ejectPlayer('player-2'); // Eject loyalist
       votingSystem['checkWinCondition']();
 
       expect(gameState.getPhase()).toBe(GamePhase.VOTING);
     });
 
-    test('should trigger imposters win when imposters >= crewmates', () => {
-      // Kill 4 crewmates, leaving 1 imposter and 1 crewmate
+    test('should trigger moles win when moles >= loyalists', () => {
+      // Kill 4 loyalists, leaving 1 mole and 1 loyalist
       players[1].status = PlayerStatus.DEAD;
       players[2].status = PlayerStatus.DEAD;
       players[3].status = PlayerStatus.DEAD;
@@ -283,8 +283,8 @@ describe('VotingSystem', () => {
       expect(gameState.getPhase()).toBe(GamePhase.GAME_OVER);
     });
 
-    test('should not trigger win when imposters < crewmates', () => {
-      // Kill 1 crewmate
+    test('should not trigger win when moles < loyalists', () => {
+      // Kill 1 loyalist
       players[1].status = PlayerStatus.DEAD;
 
       votingSystem['checkWinCondition']();
