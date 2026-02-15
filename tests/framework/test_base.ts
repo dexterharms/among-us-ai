@@ -20,7 +20,7 @@ export const createMockPlayer = (overrides: Partial<Player> = {}): Player => {
   return {
     id: MOCK_PLAYER_ID,
     name: 'Test Player',
-    role: PlayerRole.CREWMATE,
+    role: PlayerRole.LOYALIST,
     status: PlayerStatus.ALIVE,
     location: {
       roomId: MOCK_ROOM_ID,
@@ -55,7 +55,7 @@ export const createMockGameState = (overrides: Partial<GameState> = {}): GameSta
     id: MOCK_GAME_ID,
     phase: GamePhase.LOBBY,
     roundNumber: 1,
-    imposterCount: 1,
+    moleCount: 1,
     roundTimer: 0,
     players: new Map(),
     rooms: new Map(),
