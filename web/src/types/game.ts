@@ -3,8 +3,8 @@
  */
 
 export const PlayerRole = {
-  CREWMATE: 'Crewmate',
-  IMPOSTER: 'Imposter',
+  LOYALIST: 'Loyalist',
+  MOLE: 'Mole',
 } as const;
 
 export type PlayerRole = (typeof PlayerRole)[keyof typeof PlayerRole];
@@ -55,7 +55,7 @@ export interface GameState {
   id?: string;
   phase: GamePhase;
   roundNumber: number;
-  imposterCount: number;
+  moleCount: number;
   roundTimer: number;
   deadBodies: DeadBody[];
   players: Player[] | Map<string, Player>;

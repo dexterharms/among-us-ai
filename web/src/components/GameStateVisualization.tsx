@@ -43,9 +43,9 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
 
   const getRoleColor = (role: PlayerRole) => {
     switch (role) {
-      case PlayerRole.IMPOSTER:
+      case PlayerRole.MOLE:
         return '#e91e63'; // Pink
-      case PlayerRole.CREWMATE:
+      case PlayerRole.LOYALIST:
         return '#2196f3'; // Blue
       default:
         return '#9e9e9e'; // Grey
@@ -80,8 +80,8 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
           <span className="info-value">{players.length}</span>
         </div>
         <div className="info-item">
-          <span className="info-label">Imposters:</span>
-          <span className="info-value">{gameState.imposterCount}</span>
+          <span className="info-label">Moles:</span>
+          <span className="info-value">{gameState.moleCount}</span>
         </div>
         <div className="info-item">
           <span className="info-label">Dead Bodies:</span>
@@ -111,7 +111,7 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
               <div className="player-location">
                 📍 {player.location?.roomId || 'Unknown'}
               </div>
-              {player.taskProgress !== undefined && player.role === PlayerRole.CREWMATE && (
+              {player.taskProgress !== undefined && player.role === PlayerRole.LOYALIST && (
                 <div className="player-task-progress">
                   Tasks: {player.taskProgress}%
                 </div>

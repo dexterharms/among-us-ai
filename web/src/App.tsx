@@ -31,7 +31,7 @@ function App() {
     <div className={`app ${theme}`}>
       <header className="app-header">
         <div className="header-title">
-          <h1>🧬 Among Us AI</h1>
+          <h1>🕵️ Double Agent</h1>
           <span className="version">v1.0.0</span>
         </div>
         <div className="header-actions">
