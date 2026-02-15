@@ -8,12 +8,14 @@ import {
   type DeadBody,
 } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
+import { TEST_MAP } from '@/game/maps';
 
 describe('GameState', () => {
   let gameState: GameState;
 
   beforeEach(() => {
     gameState = new GameState();
+    gameState.loadMap(TEST_MAP);
   });
 
   describe('Initialization', () => {
@@ -29,7 +31,7 @@ describe('GameState', () => {
       expect(gameState.getRoundTimer()).toBe(0);
     });
 
-    test('should initialize with rooms from RoomManager', () => {
+    test('should initialize with rooms after loadMap', () => {
       const rooms = Array.from(gameState.rooms.values());
       expect(rooms.length).toBeGreaterThan(0);
       expect(rooms[0].id).toBeDefined();
@@ -544,6 +546,36 @@ describe('GameState', () => {
     test('should have EmergencyButtonSystem', () => {
       const gameState = new GameState();
       expect(gameState.getEmergencyButtonSystem()).toBeDefined();
+    });
+  });
+
+  describe('Map Loading', () => {
+    test('should have null currentMap before loading', () => {
+      const freshGameState = new GameState();
+      expect(freshGameState.getCurrentMap()).toBeNull();
+      expect(freshGameState.getMapId()).toBeNull();
+    });
+
+    test('should load map and update rooms', () => {
+      const freshGameState = new GameState();
+      freshGameState.loadMap(TEST_MAP);
+
+      expect(freshGameState.getCurrentMap()).toBe(TEST_MAP);
+      expect(freshGameState.getMapId()).toBe('test-map');
+    });
+
+    test('should sync rooms map with loaded map', () => {
+      const freshGameState = new GameState();
+      freshGameState.loadMap(TEST_MAP);
+
+      const rooms = Array.from(freshGameState.rooms.values());
+      expect(rooms.length).toBe(TEST_MAP.rooms.length);
+
+      TEST_MAP.rooms.forEach((mapRoom) => {
+        const stateRoom = freshGameState.rooms.get(mapRoom.id);
+        expect(stateRoom).toBeDefined();
+        expect(stateRoom?.name).toBe(mapRoom.name);
+      });
     });
   });
 });

@@ -3,6 +3,7 @@ import { ImposterAbilities } from '@/game/imposter';
 import { GameState } from '@/game/state';
 import { PlayerRole, PlayerStatus, GamePhase, InteractableType, type Player } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
+import { TEST_MAP } from '@/game/maps';
 
 describe('ImposterAbilities - Vent System', () => {
   let gameState: GameState;
@@ -12,6 +13,7 @@ describe('ImposterAbilities - Vent System', () => {
 
   beforeEach(() => {
     gameState = new GameState();
+    gameState.loadMap(TEST_MAP);
     imposterAbilities = new ImposterAbilities(gameState, gameState.getSSEManager());
 
     imposter = createMockPlayer({

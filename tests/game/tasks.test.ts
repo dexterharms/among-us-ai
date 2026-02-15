@@ -9,6 +9,7 @@ import {
   type Room,
 } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
+import { TEST_MAP } from '@/game/maps';
 
 describe('TaskManager', () => {
   let gameState: GameState;
@@ -24,6 +25,7 @@ describe('TaskManager', () => {
 
   beforeEach(() => {
     gameState = new GameState();
+    gameState.loadMap(TEST_MAP);
 
     // Clear existing task interactables from all rooms, then add test tasks
     // This ensures TaskManager calculates totalTasks correctly
