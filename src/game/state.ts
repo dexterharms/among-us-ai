@@ -9,6 +9,7 @@ import {
   GameEvent,
   MovementDirection,
 } from '@/types/game';
+import type { MapDefinition } from '@/game/maps/types';
 import { RoomManager } from './rooms';
 import { logger } from '@/utils/logger';
 import { ActionLogger } from '@/actions/logger';
@@ -60,9 +61,18 @@ export class GameState {
   private emergencyButtonSystem: EmergencyButtonSystem;
   private imposterAbilities?: ImposterAbilities;
   private pendingRevealQueue: PendingRevealQueue;
+  private currentMap: MapDefinition | null = null;
 
   constructor() {
-    this.roomManager = new RoomManager();
+    // Initialize with empty room manager - will be populated when map loads
+    this.roomManager = new RoomManager({
+      id: 'empty',
+      name: 'Empty',
+      rooms: [],
+      sabotageLocations: [],
+      emergencyButtonRoom: '',
+      logsRoom: '',
+    });
     this.actionLogger = new ActionLogger();
     this.sseManager = new SSEManager();
     this.taskManager = new TaskManager(this, this.sseManager);
@@ -73,10 +83,37 @@ export class GameState {
     this.emergencyButtonSystem = new EmergencyButtonSystem(this);
     this.pendingRevealQueue = new PendingRevealQueue();
 
-    // Initialize rooms from RoomManager
+    // Rooms will be populated when loadMap is called
+  }
+
+  /**
+   * Load a map and reinitialize the room manager
+   */
+  loadMap(map: MapDefinition): void {
+    this.currentMap = map;
+    this.roomManager = new RoomManager(map);
+
+    // Reinitialize rooms from new RoomManager
+    this._rooms.clear();
     this.roomManager.getRooms().forEach((room) => {
       this._rooms.set(room.id, room);
     });
+
+    logger.info('Map loaded', { mapId: map.id, mapName: map.name });
+  }
+
+  /**
+   * Get the current map definition
+   */
+  getCurrentMap(): MapDefinition | null {
+    return this.currentMap;
+  }
+
+  /**
+   * Get the current map ID
+   */
+  getMapId(): string | null {
+    return this.currentMap?.id ?? null;
   }
 
   // Setters/Getters

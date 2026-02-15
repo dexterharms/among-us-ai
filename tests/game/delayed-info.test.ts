@@ -4,6 +4,7 @@ import { RoomManager } from '@/game/rooms';
 import { GameState } from '@/game/state';
 import { PendingReveal, REVEAL_DELAY_TICKS, MovementDirection, PlayerStatus, PlayerRole } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
+import { TEST_MAP } from '@/game/maps';
 
 describe('PendingRevealQueue', () => {
   let queue: PendingRevealQueue;
@@ -136,6 +137,7 @@ describe('GameState movement reveal integration', () => {
 
   beforeEach(() => {
     gameState = new GameState();
+    gameState.loadMap(TEST_MAP);
     gameState.setPhase('ROUND' as any);
   });
 
@@ -291,7 +293,7 @@ describe('RoomManager.getDirection', () => {
   let roomManager: RoomManager;
 
   beforeEach(() => {
-    roomManager = new RoomManager();
+    roomManager = new RoomManager(TEST_MAP);
   });
 
   describe('cardinal directions', () => {

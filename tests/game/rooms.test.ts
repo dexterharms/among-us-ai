@@ -1,18 +1,23 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { RoomManager, ROOMS } from '@/game/rooms';
+import { RoomManager } from '@/game/rooms';
+import { TEST_MAP } from '@/game/maps';
 import type { Room } from '@/types/game';
 
 describe('RoomManager', () => {
   let roomManager: RoomManager;
 
   beforeEach(() => {
-    roomManager = new RoomManager();
+    roomManager = new RoomManager(TEST_MAP);
   });
 
   describe('Initialization', () => {
-    test('should initialize with all predefined rooms', () => {
+    test('should initialize with all map rooms', () => {
       const rooms = roomManager.getRooms();
-      expect(rooms.length).toBe(ROOMS.length);
+      expect(rooms.length).toBe(TEST_MAP.rooms.length);
+    });
+
+    test('should store map ID', () => {
+      expect(roomManager.getMapId()).toBe('test-map');
     });
 
     test('should have all expected rooms', () => {

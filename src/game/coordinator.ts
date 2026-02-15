@@ -3,6 +3,8 @@ import { GameState } from './state';
 import { LobbyManager } from '@/lobby/manager';
 import { SSEManager } from '@/sse/manager';
 import { logger } from '@/utils/logger';
+import { MapLoader } from './maps/loader';
+import { TEST_MAP } from './maps/test-map';
 
 /**
  * GameCoordinator manages the full game flow from lobby to game over.
@@ -12,11 +14,17 @@ export class GameCoordinator {
   private lobbyManager: LobbyManager;
   private gameState: GameState;
   private sseManager: SSEManager;
+  private mapLoader: MapLoader;
 
   constructor(lobbyManager: LobbyManager, gameState: GameState, sseManager: SSEManager) {
     this.lobbyManager = lobbyManager;
     this.gameState = gameState;
     this.sseManager = sseManager;
+
+    // Initialize map loader and register maps
+    this.mapLoader = new MapLoader();
+    this.mapLoader.register(TEST_MAP);
+    // Future maps would be registered here
   }
 
   /**
@@ -36,6 +44,10 @@ export class GameCoordinator {
       });
       return;
     }
+
+    // Select random map
+    const selectedMap = this.mapLoader.selectRandom();
+    this.gameState.loadMap(selectedMap);
 
     // Assign roles (imposters vs crewmates)
     const { imposters, crewmates } = this.lobbyManager.assignRoles();
@@ -95,6 +107,8 @@ export class GameCoordinator {
     logger.info('Game started', {
       playerCount: players.length,
       imposterCount: imposters.length,
+      mapId: selectedMap.id,
+      mapName: selectedMap.name,
     });
   }
 
@@ -169,5 +183,19 @@ export class GameCoordinator {
    */
   getGameState(): GameState {
     return this.gameState;
+  }
+
+  /**
+   * Get the map loader
+   */
+  getMapLoader(): MapLoader {
+    return this.mapLoader;
+  }
+
+  /**
+   * Get available map IDs (for debugging/UI)
+   */
+  getAvailableMaps(): string[] {
+    return this.mapLoader.getMapIds();
   }
 }
