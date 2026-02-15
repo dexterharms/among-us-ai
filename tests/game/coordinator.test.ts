@@ -23,9 +23,9 @@ describe('GameCoordinator', () => {
       expect(coordinator.getMapLoader()).toBeDefined();
     });
 
-    test('should have test-map registered', () => {
+    test('should have the-manor registered', () => {
       const mapIds = coordinator.getAvailableMaps();
-      expect(mapIds).toContain('test-map');
+      expect(mapIds).toContain('the-manor');
     });
 
     test('should select map on game start', () => {
@@ -62,7 +62,7 @@ describe('GameCoordinator', () => {
 
       coordinator.startGame();
 
-      expect(gameState.getMapId()).toBe('test-map');
+      expect(gameState.getMapId()).toBe('the-manor');
     });
   });
 });

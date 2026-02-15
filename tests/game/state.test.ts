@@ -561,7 +561,7 @@ describe('GameState', () => {
       freshGameState.loadMap(TEST_MAP);
 
       expect(freshGameState.getCurrentMap()).toBe(TEST_MAP);
-      expect(freshGameState.getMapId()).toBe('test-map');
+      expect(freshGameState.getMapId()).toBe('the-manor');
     });
 
     test('should sync rooms map with loaded map', () => {
