@@ -43,13 +43,17 @@ export function useEventStream(options: SSEOptions) {
       reconnectTimeoutRef.current = null;
     }
 
-    console.log(`[SSE] Connecting to ${url}...`);
+    if (import.meta.env.DEV) {
+      console.log(`[SSE] Connecting to ${url}...`);
+    }
 
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('[SSE] Connected');
+      if (import.meta.env.DEV) {
+        console.log('[SSE] Connected');
+      }
       setConnected(true);
       setError(null);
       retryCountRef.current = 0;
@@ -60,19 +64,25 @@ export function useEventStream(options: SSEOptions) {
         const action: ActionWithState = JSON.parse(event.data);
         setActions((prev) => [...prev, action]);
       } catch (err) {
-        console.error('[SSE] Failed to parse message:', err);
+        if (import.meta.env.DEV) {
+          console.error('[SSE] Failed to parse message:', err);
+        }
       }
     };
 
     eventSource.onerror = () => {
-      console.error('[SSE] Connection error');
+      if (import.meta.env.DEV) {
+        console.error('[SSE] Connection error');
+      }
       eventSource.close();
       setConnected(false);
 
       if (retryCountRef.current < maxRetries) {
         retryCountRef.current++;
         setError(`Reconnecting... (${retryCountRef.current}/${maxRetries})`);
-        console.log(`[SSE] Reconnecting in ${reconnectInterval}ms...`);
+        if (import.meta.env.DEV) {
+          console.log(`[SSE] Reconnecting in ${reconnectInterval}ms...`);
+        }
         reconnectTimeoutRef.current = setTimeout(connect, reconnectInterval);
       } else {
         setError('Connection failed. Max retries reached.');
@@ -88,7 +98,9 @@ export function useEventStream(options: SSEOptions) {
     }
 
     if (eventSourceRef.current) {
-      console.log('[SSE] Disconnecting');
+      if (import.meta.env.DEV) {
+        console.log('[SSE] Disconnecting');
+      }
       eventSourceRef.current.close();
       eventSourceRef.current = null;
       setConnected(false);
