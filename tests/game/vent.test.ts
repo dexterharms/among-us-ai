@@ -1,44 +1,44 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { ImposterAbilities } from '@/game/imposter';
+import { MoleAbilities } from '@/game/mole';
 import { GameState } from '@/game/state';
 import { PlayerRole, PlayerStatus, GamePhase, InteractableType, type Player } from '@/types/game';
 import { createMockPlayer } from '../framework/test_base';
 import { TEST_MAP } from '@/game/maps';
 
-describe('ImposterAbilities - Vent System', () => {
+describe('MoleAbilities - Vent System', () => {
   let gameState: GameState;
-  let imposterAbilities: ImposterAbilities;
-  let imposter: Player;
-  let crewmate: Player;
+  let moleAbilities: MoleAbilities;
+  let mole: Player;
+  let loyalist: Player;
 
   beforeEach(() => {
     gameState = new GameState();
     gameState.loadMap(TEST_MAP);
-    imposterAbilities = new ImposterAbilities(gameState, gameState.getSSEManager());
+    moleAbilities = new MoleAbilities(gameState, gameState.getSSEManager());
 
-    imposter = createMockPlayer({
-      id: 'imposter-1',
-      name: 'The Imposter',
-      role: PlayerRole.IMPOSTER,
+    mole = createMockPlayer({
+      id: 'mole-1',
+      name: 'The Mole',
+      role: PlayerRole.MOLE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'center', x: 0, y: 0 },
     });
 
-    crewmate = createMockPlayer({
-      id: 'crewmate-1',
-      name: 'Crewmate One',
-      role: PlayerRole.CREWMATE,
+    loyalist = createMockPlayer({
+      id: 'loyalist-1',
+      name: 'Loyalist One',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'center', x: 0, y: 0 },
     });
 
-    gameState.addPlayer(imposter);
-    gameState.addPlayer(crewmate);
+    gameState.addPlayer(mole);
+    gameState.addPlayer(loyalist);
     gameState.setPhase(GamePhase.ROUND);
   });
 
   describe('canVent', () => {
-    test('returns true for imposter in room with vent', () => {
+    test('returns true for mole in room with vent', () => {
       // Add vent to center room
       const room = gameState.rooms.get('center');
       if (room) {
@@ -52,39 +52,39 @@ describe('ImposterAbilities - Vent System', () => {
         });
       }
 
-      const result = imposterAbilities['canVent'](imposter.id, 'center');
+      const result = moleAbilities['canVent'](mole.id, 'center');
       expect(result).toBe(true);
     });
 
-    test('returns false when player is not imposter', () => {
-      const result = imposterAbilities['canVent'](crewmate.id, 'center');
+    test('returns false when player is not mole', () => {
+      const result = moleAbilities['canVent'](loyalist.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when player is dead', () => {
-      imposter.status = PlayerStatus.DEAD;
-      const result = imposterAbilities['canVent'](imposter.id, 'center');
+      mole.status = PlayerStatus.DEAD;
+      const result = moleAbilities['canVent'](mole.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when game phase is not ROUND', () => {
       gameState.setPhase(GamePhase.LOBBY);
-      const result = imposterAbilities['canVent'](imposter.id, 'center');
+      const result = moleAbilities['canVent'](mole.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when room has no vent', () => {
-      const result = imposterAbilities['canVent'](imposter.id, 'center');
+      const result = moleAbilities['canVent'](mole.id, 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when player does not exist', () => {
-      const result = imposterAbilities['canVent']('non-existent-player', 'center');
+      const result = moleAbilities['canVent']('non-existent-player', 'center');
       expect(result).toBe(false);
     });
 
     test('returns false when target room does not exist', () => {
-      const result = imposterAbilities['canVent'](imposter.id, 'non-existent-room');
+      const result = moleAbilities['canVent'](mole.id, 'non-existent-room');
       expect(result).toBe(false);
     });
   });
@@ -120,55 +120,55 @@ describe('ImposterAbilities - Vent System', () => {
       gameState.setPhase(GamePhase.ROUND);
     });
 
-    test('should move imposter to connected vent room', () => {
+    test('should move mole to connected vent room', () => {
       const hallwayRoom = gameState.rooms.get('hallway-west');
       expect(hallwayRoom).toBeDefined();
 
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
-      expect(imposter.location.roomId).toBe('hallway-west');
-      expect(imposter.location.x).toBe(hallwayRoom!.position.x);
-      expect(imposter.location.y).toBe(hallwayRoom!.position.y);
+      expect(mole.location.roomId).toBe('hallway-west');
+      expect(mole.location.x).toBe(hallwayRoom!.position.x);
+      expect(mole.location.y).toBe(hallwayRoom!.position.y);
     });
 
-    test('should fail if player is not imposter', () => {
-      const originalLocation = { ...crewmate.location };
+    test('should fail if player is not mole', () => {
+      const originalLocation = { ...loyalist.location };
 
-      imposterAbilities.attemptVent(crewmate.id, 'hallway-west');
+      moleAbilities.attemptVent(loyalist.id, 'hallway-west');
 
-      expect(crewmate.location).toEqual(originalLocation);
+      expect(loyalist.location).toEqual(originalLocation);
     });
 
     test('should fail if player is dead', () => {
-      imposter.status = PlayerStatus.DEAD;
-      const originalLocation = { ...imposter.location };
+      mole.status = PlayerStatus.DEAD;
+      const originalLocation = { ...mole.location };
 
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
-      expect(imposter.location).toEqual(originalLocation);
+      expect(mole.location).toEqual(originalLocation);
     });
 
     test('should fail if game phase is not ROUND', () => {
       gameState.setPhase(GamePhase.LOBBY);
-      const originalLocation = { ...imposter.location };
+      const originalLocation = { ...mole.location };
 
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
-      expect(imposter.location).toEqual(originalLocation);
+      expect(mole.location).toEqual(originalLocation);
     });
 
     test('should fail if current room has no vent', () => {
-      // Move imposter to a room without vents (and remove vents from center for this test)
+      // Move mole to a room without vents (and remove vents from center for this test)
       const room = gameState.rooms.get('center');
       if (room) {
         room.interactables = room.interactables.filter(i => i.type !== InteractableType.VENT);
       }
 
-      const originalLocation = { ...imposter.location };
+      const originalLocation = { ...mole.location };
 
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
-      expect(imposter.location).toEqual(originalLocation);
+      expect(mole.location).toEqual(originalLocation);
     });
 
     test('should fail if target room has no vent', () => {
@@ -178,26 +178,26 @@ describe('ImposterAbilities - Vent System', () => {
         hallwayRoom.interactables = hallwayRoom.interactables.filter(i => i.type !== InteractableType.VENT);
       }
 
-      const originalLocation = { ...imposter.location };
+      const originalLocation = { ...mole.location };
 
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
-      expect(imposter.location).toEqual(originalLocation);
+      expect(mole.location).toEqual(originalLocation);
     });
 
     test('should not crash when player does not exist', () => {
       // Should not throw and should not crash
-      imposterAbilities.attemptVent('non-existent-player', 'hallway-west');
-      // Verify imposter location unchanged (sanity check)
-      expect(imposter.location.roomId).toBe('center');
+      moleAbilities.attemptVent('non-existent-player', 'hallway-west');
+      // Verify mole location unchanged (sanity check)
+      expect(mole.location.roomId).toBe('center');
     });
 
     test('should not crash when target room does not exist', () => {
-      const originalLocation = { ...imposter.location };
+      const originalLocation = { ...mole.location };
 
-      imposterAbilities.attemptVent(imposter.id, 'non-existent-room');
+      moleAbilities.attemptVent(mole.id, 'non-existent-room');
 
-      expect(imposter.location).toEqual(originalLocation);
+      expect(mole.location).toEqual(originalLocation);
     });
   });
 
@@ -233,47 +233,47 @@ describe('ImposterAbilities - Vent System', () => {
     });
 
     test('should have VENT_COOLDOWN set to 30000ms (30 seconds)', () => {
-      expect(imposterAbilities['VENT_COOLDOWN']).toBe(30000);
+      expect(moleAbilities['VENT_COOLDOWN']).toBe(30000);
     });
 
     test('should set cooldown after venting', () => {
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
       // Cooldown should be set (non-zero)
-      const remaining = imposterAbilities.getVentCooldownRemaining(imposter.id);
+      const remaining = moleAbilities.getVentCooldownRemaining(mole.id);
       expect(remaining).toBeGreaterThan(0);
     });
 
     test('should prevent venting during cooldown', () => {
       // First vent
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
-      expect(imposter.location.roomId).toBe('hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
+      expect(mole.location.roomId).toBe('hallway-west');
 
-      const originalLocation = { ...imposter.location };
+      const originalLocation = { ...mole.location };
 
       // Try to vent again immediately (should fail due to cooldown)
-      imposterAbilities.attemptVent(imposter.id, 'center');
+      moleAbilities.attemptVent(mole.id, 'center');
 
       // Location should not change
-      expect(imposter.location).toEqual(originalLocation);
+      expect(mole.location).toEqual(originalLocation);
     });
 
     test('should allow venting after cooldown expires', () => {
       // First vent
-      imposterAbilities.attemptVent(imposter.id, 'hallway-west');
+      moleAbilities.attemptVent(mole.id, 'hallway-west');
 
       // Manually expire the cooldown
-      (imposterAbilities as any).ventCooldowns.set(imposter.id, Date.now() - 1);
+      (moleAbilities as any).ventCooldowns.set(mole.id, Date.now() - 1);
 
       // Should be able to vent again
-      imposterAbilities.attemptVent(imposter.id, 'center');
-      expect(imposter.location.roomId).toBe('center');
+      moleAbilities.attemptVent(mole.id, 'center');
+      expect(mole.location.roomId).toBe('center');
     });
   });
 
   describe('getVentCooldownRemaining', () => {
     test('should return 0 when no cooldown set', () => {
-      const remaining = imposterAbilities.getVentCooldownRemaining(imposter.id);
+      const remaining = moleAbilities.getVentCooldownRemaining(mole.id);
       expect(remaining).toBe(0);
     });
   });

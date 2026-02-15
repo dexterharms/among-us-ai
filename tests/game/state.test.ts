@@ -107,7 +107,7 @@ describe('GameState', () => {
       const player: Player = {
         id: 'player-1',
         name: 'Test Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 0, y: 0 },
         taskProgress: 0,
@@ -179,7 +179,7 @@ describe('GameState', () => {
     test('should clear deadBodies on round start', () => {
       const deadBody: DeadBody = {
         playerId: 'player-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         location: { roomId: 'center', x: 0, y: 0 },
         reported: false,
         roomId: 'center',
@@ -232,61 +232,61 @@ describe('GameState', () => {
     });
   });
 
-  describe('Imposter Count', () => {
-    test('should return 0 when no imposters', () => {
+  describe('Mole Count', () => {
+    test('should return 0 when no moles', () => {
       gameState.addPlayer(
-        createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }),
+        createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }),
       );
       gameState.addPlayer(
-        createMockPlayer({ id: 'player-2', role: PlayerRole.CREWMATE }),
+        createMockPlayer({ id: 'player-2', role: PlayerRole.LOYALIST }),
       );
 
-      expect(gameState.imposterCount).toBe(0);
+      expect(gameState.moleCount).toBe(0);
     });
 
-    test('should count alive imposters only', () => {
+    test('should count alive moles only', () => {
       gameState.addPlayer(
         createMockPlayer({
           id: 'player-1',
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
           status: PlayerStatus.ALIVE,
         }),
       );
       gameState.addPlayer(
         createMockPlayer({
           id: 'player-2',
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
           status: PlayerStatus.DEAD,
         }),
       );
       gameState.addPlayer(
         createMockPlayer({
           id: 'player-3',
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
           status: PlayerStatus.ALIVE,
         }),
       );
 
-      expect(gameState.imposterCount).toBe(2);
+      expect(gameState.moleCount).toBe(2);
     });
 
-    test('should return 0 when all imposters are dead', () => {
+    test('should return 0 when all moles are dead', () => {
       gameState.addPlayer(
         createMockPlayer({
           id: 'player-1',
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
           status: PlayerStatus.DEAD,
         }),
       );
       gameState.addPlayer(
         createMockPlayer({
           id: 'player-2',
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
           status: PlayerStatus.EJECTED,
         }),
       );
 
-      expect(gameState.imposterCount).toBe(0);
+      expect(gameState.moleCount).toBe(0);
     });
   });
 
@@ -317,7 +317,7 @@ describe('GameState', () => {
     test('should return false when deadBodies contains null elements', () => {
       const deadBody: DeadBody = {
         playerId: 'victim-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         location: { roomId: 'center', x: 0, y: 0 },
         reported: false,
         roomId: 'center',
@@ -337,14 +337,14 @@ describe('GameState', () => {
     test('should mark body as reported when discovered', () => {
       const deadBody: DeadBody = {
         playerId: 'victim-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         location: { roomId: 'center', x: 0, y: 0 },
         reported: false,
         roomId: 'center',
       };
 
       gameState.deadBodies.push(deadBody);
-      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }));
 
       gameState.discoverBody('player-1', 0);
 
@@ -354,14 +354,14 @@ describe('GameState', () => {
     test('should not report body with invalid bodyId', () => {
       const deadBody: DeadBody = {
         playerId: 'victim-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         location: { roomId: 'center', x: 0, y: 0 },
         reported: false,
         roomId: 'center',
       };
 
       gameState.deadBodies.push(deadBody);
-      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }));
 
       // Negative bodyId should not change deadBodies
       gameState.discoverBody('player-1', -1);
@@ -377,14 +377,14 @@ describe('GameState', () => {
     test('should not report already reported body', () => {
       const deadBody: DeadBody = {
         playerId: 'victim-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         location: { roomId: 'center', x: 0, y: 0 },
         reported: true,
         roomId: 'center',
       };
 
       gameState.deadBodies.push(deadBody);
-      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }));
 
       // Should not throw on already reported body
       expect(() => gameState.discoverBody('player-1', 0)).not.toThrow();
@@ -393,14 +393,14 @@ describe('GameState', () => {
     test('should trigger council phase when body is reported', () => {
       const deadBody: DeadBody = {
         playerId: 'victim-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         location: { roomId: 'center', x: 0, y: 0 },
         reported: false,
         roomId: 'center',
       };
 
       gameState.deadBodies.push(deadBody);
-      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }));
 
       gameState.discoverBody('player-1', 0);
 
@@ -420,7 +420,7 @@ describe('GameState', () => {
     });
 
     test('should start council phase when timer reaches zero', () => {
-      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }));
 
       gameState.startRound();
       expect(gameState.getPhase()).toBe(GamePhase.ROUND);
@@ -443,7 +443,7 @@ describe('GameState', () => {
     });
 
     test('should not start council while timer is positive', () => {
-      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.CREWMATE }));
+      gameState.addPlayer(createMockPlayer({ id: 'player-1', role: PlayerRole.LOYALIST }));
 
       gameState.startRound();
       gameState.setRoundTimer(150); // Mid-round
@@ -456,7 +456,7 @@ describe('GameState', () => {
     test('should successfully move player between connected rooms', () => {
       const player = createMockPlayer({
         id: 'player-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 0, y: 0 },
       });
@@ -478,7 +478,7 @@ describe('GameState', () => {
     test('should not move dead player', () => {
       const player = createMockPlayer({
         id: 'player-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.DEAD,
         location: { roomId: 'center', x: 0, y: 0 },
       });
@@ -494,7 +494,7 @@ describe('GameState', () => {
     test('should not move to disconnected rooms', () => {
       const player = createMockPlayer({
         id: 'player-1',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 0, y: 0 },
       });

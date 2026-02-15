@@ -22,7 +22,7 @@ describe('POST /api/game/emergency endpoint', () => {
     const player = {
       id: 'player-1',
       name: 'Player One',
-      role: PlayerRole.CREWMATE,
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'council-room', x: 0, y: 0 },
       emergencyMeetingsUsed: 0,
@@ -170,23 +170,23 @@ describe('POST /api/game/emergency endpoint', () => {
     it('should return failure during active sabotage', async () => {
       const gameState = server.getGameState();
 
-      // Add an imposter to trigger sabotage
-      const imposter = {
-        id: 'imposter-1',
-        name: 'Imposter One',
-        role: PlayerRole.IMPOSTER,
+      // Add a mole to trigger sabotage
+      const mole = {
+        id: 'mole-1',
+        name: 'Mole One',
+        role: PlayerRole.MOLE,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
       };
-      gameState.addPlayer(imposter);
+      gameState.addPlayer(mole);
 
       // Mock round start time to be past warm-up
       gameState['roundStartTime'] = Date.now() - EmergencyButtonSystem.WARMUP_DURATION_MS - 1000;
 
       // Trigger lights sabotage
       const sabotageSystem = gameState.getSabotageSystem();
-      const sabotageResult = sabotageSystem.triggerSabotage('imposter-1', { type: SabotageType.LIGHTS });
+      const sabotageResult = sabotageSystem.triggerSabotage('mole-1', { type: SabotageType.LIGHTS });
       expect(sabotageResult.success).toBe(true);
 
       const response = await fetch(`http://localhost:${port}/api/game/emergency`, {

@@ -18,24 +18,24 @@ describe('TickProcessor - Ghost Actions', () => {
     // Add some players
     const alivePlayer: Player = {
       id: 'alive-player',
-      name: 'Alive Crewmate',
-      role: PlayerRole.CREWMATE,
+      name: 'Alive Loyalist',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'cafeteria', x: 10, y: 10 },
     };
 
     const deadPlayer: Player = {
       id: 'dead-player',
-      name: 'Dead Crewmate',
-      role: PlayerRole.CREWMATE,
+      name: 'Dead Loyalist',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.DEAD,
       location: { roomId: 'cafeteria', x: 20, y: 20 },
     };
 
     const ejectedPlayer: Player = {
       id: 'ejected-player',
-      name: 'Ejected Crewmate',
-      role: PlayerRole.CREWMATE,
+      name: 'Ejected Loyalist',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.EJECTED,
       location: { roomId: 'cafeteria', x: 30, y: 30 },
     };

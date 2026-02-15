@@ -18,26 +18,26 @@ describe('POST /api/game/fix endpoint', () => {
     const gameState = server.getGameState();
 
     // Create test players
-    const imposter = {
-      id: 'imposter-1',
-      name: 'Imposter One',
-      role: PlayerRole.IMPOSTER,
+    const mole = {
+      id: 'mole-1',
+      name: 'Mole One',
+      role: PlayerRole.MOLE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-0', x: 0, y: 0 },
       tasks: [],
     };
 
-    const crewmate = {
-      id: 'crewmate-1',
-      name: 'Crewmate One',
-      role: PlayerRole.CREWMATE,
+    const loyalist = {
+      id: 'loyalist-1',
+      name: 'Loyalist One',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-0', x: 0, y: 0 },
       tasks: [],
     };
 
-    gameState.addPlayer(imposter);
-    gameState.addPlayer(crewmate);
+    gameState.addPlayer(mole);
+    gameState.addPlayer(loyalist);
     gameState.phase = GamePhase.ROUND;
   });
 
@@ -62,7 +62,7 @@ describe('POST /api/game/fix endpoint', () => {
       const response = await fetch(`http://localhost:${port}/api/game/fix`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: 'crewmate-1' }),
+        body: JSON.stringify({ playerId: 'loyalist-1' }),
       });
 
       expect(response.status).toBe(400);
@@ -84,17 +84,17 @@ describe('POST /api/game/fix endpoint', () => {
   });
 
   describe('successful fix', () => {
-    it('should return success when crewmate fixes lights sabotage', async () => {
+    it('should return success when loyalist fixes lights sabotage', async () => {
       // First, trigger a lights sabotage
       const gameState = server.getGameState();
       const sabotageSystem = gameState.getSabotageSystem();
-      sabotageSystem.triggerSabotage('imposter-1', { type: SabotageType.LIGHTS_OUT });
+      sabotageSystem.triggerSabotage('mole-1', { type: SabotageType.LIGHTS_OUT });
 
       const response = await fetch(`http://localhost:${port}/api/game/fix`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'crewmate-1',
+          playerId: 'loyalist-1',
           fixType: 'lights',
           fixData: { switchId: 'switch-1' },
         }),
@@ -109,13 +109,13 @@ describe('POST /api/game/fix endpoint', () => {
       // Trigger self-destruct sabotage
       const gameState = server.getGameState();
       const sabotageSystem = gameState.getSabotageSystem();
-      sabotageSystem.triggerSabotage('imposter-1', { type: SabotageType.SELF_DESTRUCT });
+      sabotageSystem.triggerSabotage('mole-1', { type: SabotageType.SELF_DESTRUCT });
 
       const response = await fetch(`http://localhost:${port}/api/game/fix`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'crewmate-1',
+          playerId: 'loyalist-1',
           fixType: 'self-destruct',
         }),
       });
@@ -132,7 +132,7 @@ describe('POST /api/game/fix endpoint', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'crewmate-1',
+          playerId: 'loyalist-1',
           fixType: 'lights',
         }),
       });
@@ -147,17 +147,17 @@ describe('POST /api/game/fix endpoint', () => {
       // Trigger sabotage
       const gameState = server.getGameState();
       const sabotageSystem = gameState.getSabotageSystem();
-      sabotageSystem.triggerSabotage('imposter-1', { type: SabotageType.LIGHTS_OUT });
+      sabotageSystem.triggerSabotage('mole-1', { type: SabotageType.LIGHTS_OUT });
 
-      // Make crewmate dead
-      const crewmate = gameState.players.get('crewmate-1');
-      if (crewmate) crewmate.status = PlayerStatus.DEAD;
+      // Make loyalist dead
+      const loyalist = gameState.players.get('loyalist-1');
+      if (loyalist) loyalist.status = PlayerStatus.DEAD;
 
       const response = await fetch(`http://localhost:${port}/api/game/fix`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'crewmate-1',
+          playerId: 'loyalist-1',
           fixType: 'lights',
         }),
       });

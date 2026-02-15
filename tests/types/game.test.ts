@@ -30,26 +30,26 @@ describe('Phase 2: Core Type Definitions', () => {
       validateSchema(PlayerSchema, player);
 
       expect(player.id).toBe(MOCK_PLAYER_ID);
-      expect(player.role).toBe(PlayerRole.CREWMATE);
+      expect(player.role).toBe(PlayerRole.LOYALIST);
       expect(player.status).toBe(PlayerStatus.ALIVE);
       expect(player.location).toBeDefined();
     });
 
-    test('Test player can be created with role Crewmate', () => {
-      const player = createMockPlayer({ role: PlayerRole.CREWMATE });
+    test('Test player can be created with role Loyalist', () => {
+      const player = createMockPlayer({ role: PlayerRole.LOYALIST });
       validateSchema(PlayerSchema, player);
-      expect(player.role).toBe(PlayerRole.CREWMATE);
-      expect(player.taskProgress).toBeDefined(); // Crewmates should track task progress
+      expect(player.role).toBe(PlayerRole.LOYALIST);
+      expect(player.taskProgress).toBeDefined(); // Loyalists should track task progress
     });
 
-    test('Test player can be created with role Imposter', () => {
+    test('Test player can be created with role Mole', () => {
       const player = createMockPlayer({
-        role: PlayerRole.IMPOSTER,
-        killCooldown: 30, // Imposter specific
-        taskProgress: undefined, // Imposters might fake tasks but don't contribute to progress
+        role: PlayerRole.MOLE,
+        killCooldown: 30, // Mole specific
+        taskProgress: undefined, // Moles might fake tasks but don't contribute to progress
       });
       validateSchema(PlayerSchema, player);
-      expect(player.role).toBe(PlayerRole.IMPOSTER);
+      expect(player.role).toBe(PlayerRole.MOLE);
       expect(player.killCooldown).toBe(30);
     });
 
@@ -85,27 +85,27 @@ describe('Phase 2: Core Type Definitions', () => {
       expect(player.location.y).toBe(75.2);
     });
 
-    test('Test kill cooldown for imposters', () => {
-      const imposter = createMockPlayer({
-        role: PlayerRole.IMPOSTER,
+    test('Test kill cooldown for moles', () => {
+      const mole = createMockPlayer({
+        role: PlayerRole.MOLE,
         killCooldown: 10,
       });
-      validateSchema(PlayerSchema, imposter);
-      expect(imposter.killCooldown).toBe(10);
+      validateSchema(PlayerSchema, mole);
+      expect(mole.killCooldown).toBe(10);
 
-      // Crewmates shouldn't have killCooldown (or schema should handle it)
+      // Loyalists shouldn't have killCooldown (or schema should handle it)
       // Depending on implementation, schema might be strict or loose.
       // Assuming strict:
-      // expectSchemaFailure(PlayerSchema, { ...createMockPlayer({ role: PlayerRole.CREWMATE }), killCooldown: 10 });
+      // expectSchemaFailure(PlayerSchema, { ...createMockPlayer({ role: PlayerRole.LOYALIST }), killCooldown: 10 });
     });
 
-    test('Test taskProgress for crewmates', () => {
-      const crewmate = createMockPlayer({
-        role: PlayerRole.CREWMATE,
+    test('Test taskProgress for loyalists', () => {
+      const loyalist = createMockPlayer({
+        role: PlayerRole.LOYALIST,
         taskProgress: 50,
       });
-      validateSchema(PlayerSchema, crewmate);
-      expect(crewmate.taskProgress).toBe(50);
+      validateSchema(PlayerSchema, loyalist);
+      expect(loyalist.taskProgress).toBe(50);
     });
   });
 
@@ -178,10 +178,10 @@ describe('Phase 2: Core Type Definitions', () => {
       expect(game.roundNumber).toBe(5);
     });
 
-    test('Test imposter remaining count', () => {
-      const game = createMockGameState({ imposterCount: 2 });
+    test('Test mole remaining count', () => {
+      const game = createMockGameState({ moleCount: 2 });
       validateSchema(GameStateSchema, game);
-      expect(game.imposterCount).toBe(2);
+      expect(game.moleCount).toBe(2);
     });
 
     test('Test round timer', () => {
@@ -195,7 +195,7 @@ describe('Phase 2: Core Type Definitions', () => {
         deadBodies: [
           {
             playerId: 'dead-player-1',
-            role: PlayerRole.CREWMATE,
+            role: PlayerRole.LOYALIST,
             location: { roomId: 'electrical', x: 10, y: 10 },
             reported: false,
           },
@@ -314,7 +314,7 @@ describe('Phase 2: Core Type Definitions', () => {
         type: EventType.PLAYER_EJECTED,
         payload: {
           playerId: 'ejected-player-id',
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
           tie: false,
         },
         timestamp: Date.now(),
@@ -327,7 +327,7 @@ describe('Phase 2: Core Type Definitions', () => {
         type: EventType.ROUND_STARTED,
         payload: {
           roundNumber: 2,
-          imposterCount: 1,
+          moleCount: 1,
         },
         timestamp: Date.now(),
       };
@@ -338,7 +338,7 @@ describe('Phase 2: Core Type Definitions', () => {
       const event = {
         type: EventType.ROUND_ENDED,
         payload: {
-          reason: 'imposters_win',
+          reason: 'moles_win',
           roundNumber: 1,
         },
         timestamp: Date.now(),
@@ -350,7 +350,7 @@ describe('Phase 2: Core Type Definitions', () => {
       const event = {
         type: EventType.GAME_ENDED,
         payload: {
-          winner: PlayerRole.IMPOSTER, // or "imposters"
+          winner: PlayerRole.MOLE, // or "moles"
           reason: 'sabotage_success',
         },
         timestamp: Date.now(),
@@ -364,7 +364,7 @@ describe('Phase 2: Core Type Definitions', () => {
         type: EventType.ROLE_REVEALED,
         payload: {
           playerId: MOCK_PLAYER_ID,
-          role: PlayerRole.IMPOSTER,
+          role: PlayerRole.MOLE,
         },
         timestamp: Date.now(),
       };

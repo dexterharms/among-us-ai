@@ -6,7 +6,7 @@ describe('PlayerSchema', () => {
     const player = {
       id: 'p1',
       name: 'Test',
-      role: 'Crewmate',
+      role: 'Loyalist',
       status: 'Alive',
       location: { roomId: 'room1', x: 0, y: 0 },
       emergencyMeetingsUsed: 1,
@@ -22,7 +22,7 @@ describe('PlayerSchema', () => {
     const player = {
       id: 'p1',
       name: 'Test',
-      role: 'Crewmate',
+      role: 'Loyalist',
       status: 'Alive',
       location: { roomId: 'room1', x: 0, y: 0 },
     };
@@ -37,7 +37,7 @@ describe('PlayerSchema', () => {
     const player = {
       id: 'p1',
       name: 'Test',
-      role: 'Crewmate',
+      role: 'Loyalist',
       status: 'Alive',
       location: { roomId: 'room1', x: 0, y: 0 },
       emergencyMeetingsUsed: -1,

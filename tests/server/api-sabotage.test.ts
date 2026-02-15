@@ -18,26 +18,26 @@ describe('POST /api/game/sabotage endpoint', () => {
     const gameState = server.getGameState();
 
     // Create test players
-    const imposter = {
-      id: 'imposter-1',
-      name: 'Imposter One',
-      role: PlayerRole.IMPOSTER,
+    const mole = {
+      id: 'mole-1',
+      name: 'Mole One',
+      role: PlayerRole.MOLE,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-0', x: 0, y: 0 },
       tasks: [],
     };
 
-    const crewmate = {
-      id: 'crewmate-1',
-      name: 'Crewmate One',
-      role: PlayerRole.CREWMATE,
+    const loyalist = {
+      id: 'loyalist-1',
+      name: 'Loyalist One',
+      role: PlayerRole.LOYALIST,
       status: PlayerStatus.ALIVE,
       location: { roomId: 'room-0', x: 0, y: 0 },
       tasks: [],
     };
 
-    gameState.addPlayer(imposter);
-    gameState.addPlayer(crewmate);
+    gameState.addPlayer(mole);
+    gameState.addPlayer(loyalist);
     gameState.phase = GamePhase.ROUND;
   });
 
@@ -62,7 +62,7 @@ describe('POST /api/game/sabotage endpoint', () => {
       const response = await fetch(`http://localhost:${port}/api/game/sabotage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: 'imposter-1' }),
+        body: JSON.stringify({ playerId: 'mole-1' }),
       });
 
       expect(response.status).toBe(400);
@@ -87,12 +87,12 @@ describe('POST /api/game/sabotage endpoint', () => {
   });
 
   describe('successful sabotage', () => {
-    it('should return success when imposter triggers lights sabotage', async () => {
+    it('should return success when mole triggers lights sabotage', async () => {
       const response = await fetch(`http://localhost:${port}/api/game/sabotage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'imposter-1',
+          playerId: 'mole-1',
           sabotageType: SabotageType.LIGHTS_OUT,
         }),
       });
@@ -102,12 +102,12 @@ describe('POST /api/game/sabotage endpoint', () => {
       expect(body.success).toBe(true);
     });
 
-    it('should return success when imposter triggers doors sabotage with target room', async () => {
+    it('should return success when mole triggers doors sabotage with target room', async () => {
       const response = await fetch(`http://localhost:${port}/api/game/sabotage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'imposter-1',
+          playerId: 'mole-1',
           sabotageType: SabotageType.DOORS,
           targetRoomId: 'room-0',
         }),
@@ -118,12 +118,12 @@ describe('POST /api/game/sabotage endpoint', () => {
       expect(body.success).toBe(true);
     });
 
-    it('should return success when imposter triggers self-destruct sabotage', async () => {
+    it('should return success when mole triggers self-destruct sabotage', async () => {
       const response = await fetch(`http://localhost:${port}/api/game/sabotage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'imposter-1',
+          playerId: 'mole-1',
           sabotageType: SabotageType.SELF_DESTRUCT,
         }),
       });
@@ -135,12 +135,12 @@ describe('POST /api/game/sabotage endpoint', () => {
   });
 
   describe('failure cases', () => {
-    it('should return failure when crewmate tries to sabotage', async () => {
+    it('should return failure when loyalist tries to sabotage', async () => {
       const response = await fetch(`http://localhost:${port}/api/game/sabotage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'crewmate-1',
+          playerId: 'loyalist-1',
           sabotageType: SabotageType.LIGHTS_OUT,
         }),
       });
@@ -148,7 +148,7 @@ describe('POST /api/game/sabotage endpoint', () => {
       expect(response.status).toBe(200);
       const body = (await response.json()) as { success: boolean; reason: string };
       expect(body.success).toBe(false);
-      expect(body.reason).toContain('imposter');
+      expect(body.reason).toContain('mole');
     });
 
     it('should return failure when sabotage is already active', async () => {
@@ -157,7 +157,7 @@ describe('POST /api/game/sabotage endpoint', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'imposter-1',
+          playerId: 'mole-1',
           sabotageType: SabotageType.LIGHTS_OUT,
         }),
       });
@@ -167,7 +167,7 @@ describe('POST /api/game/sabotage endpoint', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'imposter-1',
+          playerId: 'mole-1',
           sabotageType: SabotageType.LIGHTS_OUT,
         }),
       });
@@ -177,17 +177,17 @@ describe('POST /api/game/sabotage endpoint', () => {
       expect(body.success).toBe(false);
     });
 
-    it('should return failure when imposter is dead', async () => {
-      // Make imposter dead
+    it('should return failure when mole is dead', async () => {
+      // Make mole dead
       const gameState = server.getGameState();
-      const imposter = gameState.players.get('imposter-1');
-      if (imposter) imposter.status = PlayerStatus.DEAD;
+      const mole = gameState.players.get('mole-1');
+      if (mole) mole.status = PlayerStatus.DEAD;
 
       const response = await fetch(`http://localhost:${port}/api/game/sabotage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          playerId: 'imposter-1',
+          playerId: 'mole-1',
           sabotageType: SabotageType.LIGHTS_OUT,
         }),
       });

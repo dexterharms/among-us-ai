@@ -34,7 +34,7 @@ describe('GameCoordinator', () => {
         {
           id: 'p1',
           name: 'Alice',
-          role: PlayerRole.CREWMATE,
+          role: PlayerRole.LOYALIST,
           status: PlayerStatus.ALIVE,
           location: { roomId: 'center', x: 0, y: 0 },
           emergencyMeetingsUsed: 0,
@@ -42,7 +42,7 @@ describe('GameCoordinator', () => {
         {
           id: 'p2',
           name: 'Bob',
-          role: PlayerRole.CREWMATE,
+          role: PlayerRole.LOYALIST,
           status: PlayerStatus.ALIVE,
           location: { roomId: 'center', x: 0, y: 0 },
           emergencyMeetingsUsed: 0,
@@ -50,7 +50,7 @@ describe('GameCoordinator', () => {
         {
           id: 'p3',
           name: 'Charlie',
-          role: PlayerRole.CREWMATE,
+          role: PlayerRole.LOYALIST,
           status: PlayerStatus.ALIVE,
           location: { roomId: 'center', x: 0, y: 0 },
           emergencyMeetingsUsed: 0,

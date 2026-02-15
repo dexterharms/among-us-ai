@@ -24,7 +24,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Dead Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.DEAD,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -38,7 +38,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'center', x: 0, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -52,7 +52,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -67,7 +67,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -82,7 +82,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -96,7 +96,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 1, // Already used
@@ -111,7 +111,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -127,7 +127,7 @@ describe('EmergencyButtonSystem', () => {
       const player = {
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -144,7 +144,7 @@ describe('EmergencyButtonSystem', () => {
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -166,21 +166,21 @@ describe('EmergencyButtonSystem', () => {
 
   describe('sabotage blocking', () => {
     test('returns false during active sabotage', () => {
-      // Add an imposter to trigger sabotage
+      // Add a mole to trigger sabotage
       gameState.addPlayer({
-        id: 'imposter',
-        name: 'Imposter',
-        role: PlayerRole.IMPOSTER,
+        id: 'mole',
+        name: 'Mole',
+        role: PlayerRole.MOLE,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
       });
 
-      // Add a crewmate who will try to call emergency
+      // Add a loyalist who will try to call emergency
       gameState.addPlayer({
         id: 'p1',
         name: 'Player',
-        role: PlayerRole.CREWMATE,
+        role: PlayerRole.LOYALIST,
         status: PlayerStatus.ALIVE,
         location: { roomId: 'council-room', x: -2, y: 0 },
         emergencyMeetingsUsed: 0,
@@ -189,9 +189,9 @@ describe('EmergencyButtonSystem', () => {
       // Set game phase to ROUND (required for sabotage)
       gameState.setPhase(GamePhase.ROUND);
 
-      // Trigger a sabotage (by the imposter)
+      // Trigger a sabotage (by the mole)
       const sabotageSystem = gameState.getSabotageSystem();
-      const sabotageResult = sabotageSystem.triggerSabotage('imposter', { type: SabotageType.LIGHTS });
+      const sabotageResult = sabotageSystem.triggerSabotage('mole', { type: SabotageType.LIGHTS });
       expect(sabotageResult.success).toBe(true);
 
       const roundStart = Date.now() - 30000;
