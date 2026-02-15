@@ -49,7 +49,11 @@ export class MapLoader {
 
     const randomIndex = Math.floor(Math.random() * mapIds.length);
     const selectedId = mapIds[randomIndex];
-    const selectedMap = this.maps.get(selectedId)!;
+    const selectedMap = this.maps.get(selectedId);
+
+    if (!selectedMap) {
+      throw new Error(`Map not found: ${selectedId}`);
+    }
 
     logger.info('Map selected randomly', {
       mapId: selectedId,

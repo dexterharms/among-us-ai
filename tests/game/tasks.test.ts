@@ -111,16 +111,6 @@ describe('TaskManager', () => {
     taskManager = new TaskManager(gameState, gameState.getSSEManager());
   });
 
-    // Create players: 1 imposter, 3 crewmates
-    imposter = createMockPlayer({
-      id: 'imposter-1',
-      name: 'The Imposter',
-      role: PlayerRole.IMPOSTER,
-      status: PlayerStatus.ALIVE,
-      location: { roomId: 'cafeteria', x: 0, y: 0 },
-    });
-
-
   describe('attemptTask', () => {
     test('should successfully complete a task for a living crewmate', () => {
       // Pass empty action to simulate successful minigame completion
