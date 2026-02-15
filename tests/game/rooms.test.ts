@@ -17,7 +17,7 @@ describe('RoomManager', () => {
     });
 
     test('should store map ID', () => {
-      expect(roomManager.getMapId()).toBe('test-map');
+      expect(roomManager.getMapId()).toBe('the-manor');
     });
 
     test('should have all expected rooms', () => {

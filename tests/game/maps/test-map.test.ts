@@ -9,11 +9,11 @@ describe('TEST_MAP', () => {
   });
 
   test('should have correct id', () => {
-    expect(TEST_MAP.id).toBe('test-map');
+    expect(TEST_MAP.id).toBe('the-manor');
   });
 
   test('should have correct name', () => {
-    expect(TEST_MAP.name).toBe('Test Map');
+    expect(TEST_MAP.name).toBe('The Manor');
   });
 
   test('should have 6 rooms matching existing ROOMS constant', () => {
