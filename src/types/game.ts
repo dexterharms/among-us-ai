@@ -3,8 +3,8 @@ import { z } from 'zod';
 // --- Enums ---
 
 export enum PlayerRole {
-  CREWMATE = 'Crewmate',
-  IMPOSTER = 'Imposter',
+  LOYALIST = 'Loyalist',
+  MOLE = 'Mole',
 }
 
 export enum PlayerStatus {
@@ -70,7 +70,7 @@ export enum EventType {
   PLAYER_EJECTED = 'PlayerEjected',
   PLAYER_KILLED = 'PlayerKilled', // Broadcast when a player is killed
   YOU_DIED = 'YouDied', // Private event sent to victim
-  PLAYER_VENTED = 'PlayerVented', // Broadcast when imposter uses vent
+  PLAYER_VENTED = 'PlayerVented', // Broadcast when mole uses vent
   TASK_COMPLETED = 'TaskCompleted',
   TASK_FAILED = 'TaskFailed',
   ROUND_STARTED = 'RoundStarted',
@@ -105,7 +105,7 @@ export const PlayerSchema = z.object({
   role: PlayerRoleSchema,
   status: PlayerStatusSchema,
   location: PlayerLocationSchema,
-  taskProgress: z.number().min(0).max(100).optional(), // Optional for imposters
+  taskProgress: z.number().min(0).max(100).optional(), // Optional for moles
   killCooldown: z.number().min(0).optional(),
   tasks: z.array(z.string()).optional(), // Placeholder for tasks
   emergencyMeetingsUsed: z.number().min(0).default(0),
@@ -156,7 +156,7 @@ export const GameStateSchema = z.object({
   id: z.string().optional(),
   phase: GamePhaseSchema,
   roundNumber: z.number().int().min(1),
-  imposterCount: z.number().int().min(0), // Changed from impostersRemaining
+  moleCount: z.number().int().min(0), // Number of living moles
   roundTimer: z.number().min(0),
   deadBodies: z.array(DeadBodySchema),
   players: z.map(z.string(), PlayerSchema).or(z.array(PlayerSchema)), // Handle both Map and Array for flexibility
@@ -203,10 +203,10 @@ export const PlayerEjectedPayload = z.object({
   role: PlayerRoleSchema.nullable().optional(), // optional when no ejection
   tie: z.boolean().optional(),
 });
-export const RoundStartedPayload = z.object({ roundNumber: z.number(), imposterCount: z.number() });
+export const RoundStartedPayload = z.object({ roundNumber: z.number(), moleCount: z.number() });
 export const RoundEndedPayload = z.object({ reason: z.string(), roundNumber: z.number() });
 export const GameEndedPayload = z.object({
-  winner: z.union([z.literal('Crewmates'), z.literal('Imposters'), PlayerRoleSchema]),
+  winner: z.union([z.literal('Loyalists'), z.literal('Moles'), PlayerRoleSchema]),
   reason: z.string(),
 });
 export const PlayerVentedPayload = z.object({
@@ -230,7 +230,7 @@ export const LobbyStatePayload = z.object({
 // Game Flow Payloads
 export const GameStartedPayload = z.object({
   playerCount: z.number(),
-  imposterCount: z.number(),
+  moleCount: z.number(),
 });
 export const GameOverSummaryPayload = z.object({
   phase: z.string(),
