@@ -442,3 +442,7 @@ export const GameEventSchema = z.discriminatedUnion('type', [
   SabotageFixedEventSchema,
 ]);
 export type GameEvent = z.infer<typeof GameEventSchema>;
+
+// Re-export map types
+export type { MapDefinition, SabotageLocation, VentConnection } from '@/game/maps/types';
+export { MapDefinitionSchema, SabotageLocationSchema, VentConnectionSchema } from '@/game/maps/types';
