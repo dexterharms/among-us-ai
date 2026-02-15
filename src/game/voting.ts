@@ -241,32 +241,32 @@ export class VotingSystem {
   }
 
   checkWinCondition(): void {
-    const imposters = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.IMPOSTER && p.status === PlayerStatus.ALIVE,
+    const moles = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.MOLE && p.status === PlayerStatus.ALIVE,
     );
-    const crewmates = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.CREWMATE && p.status === PlayerStatus.ALIVE,
+    const loyalists = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.LOYALIST && p.status === PlayerStatus.ALIVE,
     );
 
     logger.debug('Checking win condition', {
-      livingImposters: imposters.length,
-      livingCrewmates: crewmates.length,
+      livingMoles: moles.length,
+      livingLoyalists: loyalists.length,
       totalPlayers: this.gameState.players.size,
     });
 
-    // Crewmates win if all imposters ejected
-    if (imposters.length === 0) {
-      this.endGame('Crewmates', 'All imposters ejected');
+    // Loyalists win if all moles ejected
+    if (moles.length === 0) {
+      this.endGame('Loyalists', 'All moles ejected');
       return;
     }
 
-    // Imposters win if they outnumber or equal crewmates
-    if (imposters.length >= crewmates.length) {
-      this.endGame('Imposters', 'Imposters outnumber Crewmates');
+    // Moles win if they outnumber or equal loyalists
+    if (moles.length >= loyalists.length) {
+      this.endGame('Moles', 'Moles outnumber Loyalists');
     }
   }
 
-  private endGame(winner: 'Crewmates' | 'Imposters', reason: string): void {
+  private endGame(winner: 'Loyalists' | 'Moles', reason: string): void {
     this.gameState.phase = GamePhase.GAME_OVER;
 
     logger.logGameEvent(EventType.GAME_ENDED, {
@@ -280,7 +280,7 @@ export class VotingSystem {
       timestamp: Date.now(),
       type: EventType.GAME_ENDED,
       payload: {
-        winner: winner as 'Crewmates' | 'Imposters',
+        winner: winner as 'Loyalists' | 'Moles',
         reason,
       },
     };

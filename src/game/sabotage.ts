@@ -27,7 +27,7 @@ export interface SabotageAction {
 }
 
 /**
- * SabotageSystem handles imposter sabotage abilities
+ * SabotageSystem handles mole sabotage abilities
  * - Lights out: Global visibility loss, 4 switches to flip
  * - Doors: Room exits locked, requires code entry
  * - Self-destruct: Global timer, requires stop button press
@@ -69,12 +69,12 @@ export class SabotageSystem {
       return { success: false, reason: 'Player not found' };
     }
 
-    if (player.role !== 'Imposter') {
-      return { success: false, reason: 'Only imposters can sabotage' };
+    if (player.role !== 'Mole') {
+      return { success: false, reason: 'Only moles can sabotage' };
     }
 
     if (player.status !== PlayerStatus.ALIVE) {
-      return { success: false, reason: 'Dead imposters cannot sabotage' };
+      return { success: false, reason: 'Dead moles cannot sabotage' };
     }
 
     // Check game phase
@@ -141,7 +141,7 @@ export class SabotageSystem {
     this.sseManager.broadcast(event);
 
     logger.logGameEvent(EventType.SABOTAGE_TRIGGERED, {
-      imposterId: playerId,
+      moleId: playerId,
       sabotageType: normalizedType,
       target: targetRoomId,
       sabotageId,
@@ -164,7 +164,7 @@ export class SabotageSystem {
   }
 
   /**
-   * Force crewmates on tasks to quit due to sabotage
+   * Force loyalists on tasks to quit due to sabotage
    */
   private forceTaskInterruption(): void {
     if (!this.minigameManager) return;
@@ -172,7 +172,7 @@ export class SabotageSystem {
     const interruptedPlayers: string[] = [];
 
     this.gameState.players.forEach((player, playerId) => {
-      if (player.status !== PlayerStatus.ALIVE || player.role !== 'Crewmate') {
+      if (player.status !== PlayerStatus.ALIVE || player.role !== 'Loyalist') {
         return;
       }
 
@@ -237,8 +237,8 @@ export class SabotageSystem {
       return { success: false, reason: 'Player not found' };
     }
 
-    if (player.role === 'Imposter') {
-      return { success: false, reason: 'Only crewmates can fix sabotages' };
+    if (player.role === 'Mole') {
+      return { success: false, reason: 'Only loyalists can fix sabotages' };
     }
 
     const sabotage = this.activeSabotages.get(sabotageId);
@@ -380,7 +380,7 @@ export class SabotageSystem {
       payload: {
         sabotageId,
         type: sabotageType as 'lights' | 'doors' | 'self-destruct',
-        reason: 'Fixed by crewmates',
+        reason: 'Fixed by loyalists',
         success: true,
       },
     };
@@ -422,7 +422,7 @@ export class SabotageSystem {
 
       if (timeRemaining <= 0) {
         this.clearSabotageTimer();
-        this.triggerImpostersWin('Self-destruct timer expired');
+        this.triggerMolesWin('Self-destruct timer expired');
       }
     }, 1000);
   }
@@ -438,11 +438,11 @@ export class SabotageSystem {
   }
 
   /**
-   * Trigger imposters win condition
+   * Trigger moles win condition
    */
-  private triggerImpostersWin(reason: string): void {
+  private triggerMolesWin(reason: string): void {
     logger.logGameEvent(EventType.GAME_ENDED, {
-      winner: 'Imposters',
+      winner: 'Moles',
       reason,
     });
 
@@ -450,7 +450,7 @@ export class SabotageSystem {
       timestamp: Date.now(),
       type: EventType.GAME_ENDED,
       payload: {
-        winner: 'Imposters',
+        winner: 'Moles',
         reason,
       },
     });

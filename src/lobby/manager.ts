@@ -8,7 +8,7 @@ export class LobbyManager {
   private readyStatus: Set<string> = new Set();
   private isCountdownActive: boolean = false;
   private readonly MIN_PLAYERS = 3;
-  private readonly MAX_PLAYERS = 15; // Among Us max players
+  private readonly MAX_PLAYERS = 15; // Double Agent max players
   private readonly COUNTDOWN_DURATION = 5000; // 5 seconds
   private sseManager: SSEManager;
   private onCountdownComplete: (() => void) | null = null;
@@ -212,38 +212,38 @@ export class LobbyManager {
     this.sseManager.broadcast(cancelEvent);
   }
 
-  assignRoles(): { crewmates: string[]; imposters: string[] } {
+  assignRoles(): { loyalists: string[]; moles: string[] } {
     const playerIds = Array.from(this.players.keys());
-    const imposterCount = playerIds.length >= 7 ? 2 : 1;
+    const moleCount = playerIds.length >= 7 ? 2 : 1;
     const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
 
-    const imposters = shuffled.slice(0, imposterCount);
-    const crewmates = shuffled.slice(imposterCount);
+    const moles = shuffled.slice(0, moleCount);
+    const loyalists = shuffled.slice(moleCount);
 
-    const imposterNames: string[] = [];
+    const moleNames: string[] = [];
 
-    imposters.forEach((id) => {
+    moles.forEach((id) => {
       const p = this.players.get(id);
       if (p) {
-        p.role = PlayerRole.IMPOSTER;
-        imposterNames.push(p.name);
+        p.role = PlayerRole.MOLE;
+        moleNames.push(p.name);
       }
     });
 
-    crewmates.forEach((id) => {
+    loyalists.forEach((id) => {
       const p = this.players.get(id);
-      if (p) p.role = PlayerRole.CREWMATE;
+      if (p) p.role = PlayerRole.LOYALIST;
     });
 
     logger.logGameEvent('RolesAssigned', {
       totalPlayers: playerIds.length,
-      imposterCount,
-      imposterIds: imposters,
-      imposterNames,
-      crewmateCount: crewmates.length,
+      moleCount,
+      moleIds: moles,
+      moleNames,
+      loyalistCount: loyalists.length,
     });
 
-    return { crewmates, imposters };
+    return { loyalists, moles };
   }
 
   broadcastLobbyState(): void {

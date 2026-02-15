@@ -87,8 +87,8 @@ export class TaskManager {
       return { success: false, reason: 'Player is not alive' };
     }
 
-    if (player.role !== PlayerRole.CREWMATE) {
-      return { success: false, reason: 'Only crewmates can complete tasks' };
+    if (player.role !== PlayerRole.LOYALIST) {
+      return { success: false, reason: 'Only loyalists can complete tasks' };
     }
 
     if (this.gameState.phase !== GamePhase.ROUND) {
@@ -197,11 +197,11 @@ export class TaskManager {
     player.tasks.push(taskId);
 
     // Calculate progress
-    const livingCrewmateCount = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.CREWMATE && p.status === PlayerStatus.ALIVE,
+    const livingLoyalistCount = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.LOYALIST && p.status === PlayerStatus.ALIVE,
     ).length;
 
-    const totalPossibleTasks = this.totalTasks * livingCrewmateCount;
+    const totalPossibleTasks = this.totalTasks * livingLoyalistCount;
     const completedTasks = this.getCompletedTaskCount();
     const overallProgress =
       totalPossibleTasks > 0 ? Math.round((completedTasks / totalPossibleTasks) * 100) : 0;
@@ -260,8 +260,8 @@ export class TaskManager {
       return { success: false, reason: 'Player is not alive' };
     }
 
-    if (player.role !== PlayerRole.CREWMATE) {
-      return { success: false, reason: 'Only crewmates can complete tasks' };
+    if (player.role !== PlayerRole.LOYALIST) {
+      return { success: false, reason: 'Only loyalists can complete tasks' };
     }
 
     if (this.gameState.phase !== GamePhase.ROUND) {
@@ -305,13 +305,13 @@ export class TaskManager {
   }
 
   /**
-   * Get the count of completed tasks from LIVING crewmates only.
-   * Dead crewmates' tasks do not count toward the win condition.
+   * Get the count of completed tasks from LIVING loyalists only.
+   * Dead loyalists' tasks do not count toward the win condition.
    */
   getCompletedTaskCount(): number {
     let count = 0;
     this.gameState.players.forEach((player) => {
-      if (player.status === PlayerStatus.ALIVE && player.role === PlayerRole.CREWMATE && player.tasks) {
+      if (player.status === PlayerStatus.ALIVE && player.role === PlayerRole.LOYALIST && player.tasks) {
         count += player.tasks.length;
       }
     });
@@ -323,7 +323,7 @@ export class TaskManager {
       this.gameState.phase = GamePhase.GAME_OVER;
 
       logger.logGameEvent(EventType.GAME_ENDED, {
-        winner: 'Crewmates',
+        winner: 'Loyalists',
         reason: 'All tasks completed',
         overallProgress,
       });
@@ -332,7 +332,7 @@ export class TaskManager {
         timestamp: Date.now(),
         type: EventType.GAME_ENDED,
         payload: {
-          winner: 'Crewmates',
+          winner: 'Loyalists',
           reason: 'All tasks completed',
         },
       };
@@ -349,14 +349,14 @@ export class TaskManager {
 
   /**
    * Assign tasks to players at game start (HAR-32)
-   * Distributes tasks evenly among crewmates
+   * Distributes tasks evenly among loyalists
    */
   assignTasksToPlayers(): void {
-    const crewmates = Array.from(this.gameState.players.values()).filter(
-      (p) => p.role === PlayerRole.CREWMATE,
+    const loyalists = Array.from(this.gameState.players.values()).filter(
+      (p) => p.role === PlayerRole.LOYALIST,
     );
 
-    if (crewmates.length === 0) {
+    if (loyalists.length === 0) {
       return;
     }
 
@@ -367,9 +367,9 @@ export class TaskManager {
     const shuffledTasks = this.shuffleArray(allTaskIds);
 
     // Distribute tasks evenly
-    crewmates.forEach((player, index) => {
-      // Assign each crewmate a subset of tasks
-      const tasksPerPlayer = Math.ceil(shuffledTasks.length / crewmates.length);
+    loyalists.forEach((player, index) => {
+      // Assign each loyalist a subset of tasks
+      const tasksPerPlayer = Math.ceil(shuffledTasks.length / loyalists.length);
       const startIndex = index * tasksPerPlayer;
       const endIndex = Math.min(startIndex + tasksPerPlayer, shuffledTasks.length);
 
@@ -383,8 +383,8 @@ export class TaskManager {
       });
     });
 
-    logger.info('Tasks assigned to crewmates', {
-      crewmateCount: crewmates.length,
+    logger.info('Tasks assigned to loyalists', {
+      loyalistCount: loyalists.length,
       totalTasks: allTaskIds.length,
     });
   }
