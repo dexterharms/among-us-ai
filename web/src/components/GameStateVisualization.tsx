@@ -1,8 +1,50 @@
+import { useMemo } from 'react';
 import type { ActionWithState } from '@/hooks/useEventStream';
 import { PlayerStatus, PlayerRole, type Player, type DeadBody, type GameState } from '@/types/game';
 
 interface GameStateVisualizationProps {
   actions: ActionWithState[];
+}
+
+// Pure utility functions moved outside component to avoid recreation on every render
+function getStatusColor(status: PlayerStatus): string {
+  switch (status) {
+    case PlayerStatus.ALIVE:
+      return '#4caf50'; // Green
+    case PlayerStatus.DEAD:
+      return '#f44336'; // Red
+    case PlayerStatus.EJECTED:
+      return '#ff9800'; // Orange
+    default:
+      return '#9e9e9e'; // Grey
+  }
+}
+
+function getRoleColor(role: PlayerRole): string {
+  switch (role) {
+    case PlayerRole.MOLE:
+      return '#e91e63'; // Pink
+    case PlayerRole.LOYALIST:
+      return '#2196f3'; // Blue
+    default:
+      return '#9e9e9e'; // Grey
+  }
+}
+
+function formatTimer(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Helper to convert players to array (handles both Map and Array formats)
+ */
+function playersToArray(players: GameState['players'] | undefined): Player[] {
+  if (!players) return [];
+  return Array.from(
+    players instanceof Map ? players.values() : players
+  );
 }
 
 /**
@@ -13,7 +55,14 @@ interface GameStateVisualizationProps {
 export function GameStateVisualization({ actions }: GameStateVisualizationProps) {
   // Get the most recent action with game state
   const latestAction = actions[actions.length - 1];
-  const gameState = latestAction?.gameState as GameState | undefined;
+  // Handle null properly (ActionWithState.gameState is GameState | null)
+  const gameState = latestAction?.gameState;
+
+  // Memoize players array conversion to avoid reallocation on every render
+  const players = useMemo(
+    () => playersToArray(gameState?.players),
+    [gameState?.players]
+  );
 
   if (!gameState) {
     return (
@@ -22,43 +71,6 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
       </div>
     );
   }
-
-  // Safely handle both Map and Array for players with validation
-  const players: Player[] = gameState.players
-    ? Array.from(
-        gameState.players instanceof Map ? gameState.players.values() : gameState.players
-      )
-    : [];
-
-  const getStatusColor = (status: PlayerStatus) => {
-    switch (status) {
-      case PlayerStatus.ALIVE:
-        return '#4caf50'; // Green
-      case PlayerStatus.DEAD:
-        return '#f44336'; // Red
-      case PlayerStatus.EJECTED:
-        return '#ff9800'; // Orange
-      default:
-        return '#9e9e9e'; // Grey
-    }
-  };
-
-  const getRoleColor = (role: PlayerRole) => {
-    switch (role) {
-      case PlayerRole.MOLE:
-        return '#e91e63'; // Pink
-      case PlayerRole.LOYALIST:
-        return '#2196f3'; // Blue
-      default:
-        return '#9e9e9e'; // Grey
-    }
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className="game-state">

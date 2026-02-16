@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 import type { ActionWithState } from '@/hooks/useEventStream';
 
 interface LogViewerProps {
@@ -15,15 +15,25 @@ export function LogViewer({ actions, maxVisible = 100 }: LogViewerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new actions arrive
+  // Auto-scroll to bottom when new actions arrive (only if already at bottom)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = scrollRef.current;
+    if (container) {
+      // Check if user is near bottom before auto-scrolling
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      if (isNearBottom) {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   }, [actions]);
 
-  // Show only the most recent actions
-  const visibleActions = actions.slice(-maxVisible);
+  // Memoize visible actions to avoid slice on every render
+  const visibleActions = useMemo(
+    () => actions.slice(-maxVisible),
+    [actions, maxVisible]
+  );
 
-  const formatTimestamp = (timestamp: number) => {
+  const formatTimestamp = useCallback((timestamp: number): string => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('en-US', {
       hour12: false,
@@ -31,15 +41,19 @@ export function LogViewer({ actions, maxVisible = 100 }: LogViewerProps) {
       minute: '2-digit',
       second: '2-digit',
     });
-  };
+  }, []);
 
-  const formatPayload = (payload: unknown): string => {
+  const formatPayload = useCallback((payload: unknown): string => {
     if (!payload) return '';
-    if (typeof payload === 'object') {
-      return JSON.stringify(payload, null, 2);
+    try {
+      if (typeof payload === 'object') {
+        return JSON.stringify(payload, null, 2);
+      }
+      return String(payload);
+    } catch {
+      return '[Complex Object]';
     }
-    return String(payload);
-  };
+  }, []);
 
   return (
     <div className="log-viewer" ref={scrollRef}>
@@ -52,6 +66,7 @@ export function LogViewer({ actions, maxVisible = 100 }: LogViewerProps) {
         className="log-list"
         role="log"
         aria-live="polite"
+        aria-atomic="false"
         aria-label="Game action log"
         aria-relevant="additions"
       >

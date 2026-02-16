@@ -16,7 +16,10 @@ interface SSEOptions {
   url: string;
   reconnectInterval?: number;
   maxRetries?: number;
+  maxActions?: number;
 }
+
+const DEFAULT_MAX_ACTIONS = 500;
 
 /**
  * Type guard to validate that parsed data has the expected structure
@@ -38,7 +41,12 @@ function isValidActionWithState(data: unknown): data is ActionWithState {
  * Connects to SSE endpoint and streams game events in real-time.
  */
 export function useEventStream(options: SSEOptions) {
-  const { url, reconnectInterval = 5000, maxRetries = 10 } = options;
+  const {
+    url,
+    reconnectInterval = 5000,
+    maxRetries = 10,
+    maxActions = DEFAULT_MAX_ACTIONS,
+  } = options;
 
   const [actions, setActions] = useState<ActionWithState[]>([]);
   const [connected, setConnected] = useState(false);
@@ -80,16 +88,22 @@ export function useEventStream(options: SSEOptions) {
 
         // Validate the parsed data structure
         if (isValidActionWithState(parsed)) {
-          setActions((prev) => [...prev, parsed]);
+          // Limit array size to prevent memory leak - keep most recent maxActions
+          setActions((prev) => {
+            const newActions = [...prev, parsed];
+            if (newActions.length > maxActions) {
+              return newActions.slice(-maxActions);
+            }
+            return newActions;
+          });
         } else {
           if (import.meta.env.DEV) {
             console.warn('[SSE] Received malformed message, skipping:', parsed);
           }
         }
       } catch (err) {
-        if (import.meta.env.DEV) {
-          console.error('[SSE] Failed to parse message:', err);
-        }
+        // Always log parse errors, include raw data for debugging
+        console.error('[SSE] Failed to parse message:', err, 'Raw data:', event.data);
       }
     };
 
@@ -111,7 +125,7 @@ export function useEventStream(options: SSEOptions) {
         setError('Connection failed. Max retries reached.');
       }
     };
-  }, [url, reconnectInterval, maxRetries]);
+  }, [url, reconnectInterval, maxRetries, maxActions]);
 
   const disconnect = useCallback(() => {
     // Clear any pending reconnect timeout

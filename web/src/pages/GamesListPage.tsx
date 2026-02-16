@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 
@@ -12,9 +12,12 @@ interface WatchlistItem {
   favorite: boolean;
 }
 
+// Extended status type to include 'unknown' for games not found in mock data
+type GameStatus = 'lobby' | 'playing' | 'voting' | 'gameover' | 'unknown';
+
 interface GameData {
   gameId: string;
-  status: 'lobby' | 'playing' | 'voting' | 'gameover';
+  status: GameStatus;
   playerCount: number;
   maxPlayers: number;
   mapName: string;
@@ -121,7 +124,7 @@ const GameMeta = styled.div`
   font-size: 0.875rem;
 `;
 
-const StatusBadge = styled.span<{ status: string }>`
+const StatusBadge = styled.span<{ status: GameStatus }>`
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -142,7 +145,7 @@ const StatusBadge = styled.span<{ status: string }>`
       case 'gameover':
         return `background: rgba(100, 116, 139, 0.2); color: #94a3b8;`;
       default:
-        return `background: rgba(100, 116, 139, 0.2); color: #94a3b8;`;
+        return `background: rgba(100, 116, 139, 0.1); color: #64748b;`;
     }
   }}
 `;
@@ -192,7 +195,7 @@ const mockGames: GameData[] = [
 ];
 
 // Status text mapping for accessibility
-const getStatusText = (status: string): string => {
+function getStatusText(status: GameStatus): string {
   switch (status) {
     case 'lobby': return 'In Lobby';
     case 'playing': return 'Currently Playing';
@@ -200,7 +203,18 @@ const getStatusText = (status: string): string => {
     case 'gameover': return 'Game Over';
     default: return 'Unknown Status';
   }
-};
+}
+
+// Status emoji mapping
+function getStatusEmoji(status: GameStatus): string {
+  switch (status) {
+    case 'lobby': return '🟢';
+    case 'playing':
+    case 'voting': return '🔴';
+    case 'gameover': return '⬛';
+    default: return '⚪';
+  }
+}
 
 export function GamesListPage() {
   const navigate = useNavigate();
@@ -222,19 +236,29 @@ export function GamesListPage() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        setWatchlist(JSON.parse(saved));
-      } catch {
-        // ignore parse errors
+        const parsed = JSON.parse(saved);
+        // Basic validation
+        if (Array.isArray(parsed)) {
+          setWatchlist(parsed);
+        }
+      } catch (err) {
+        console.error('[Watchlist] Failed to parse saved data:', err);
+        // Clear corrupted data
+        localStorage.removeItem(STORAGE_KEY);
       }
     }
   }, []);
 
-  const saveWatchlist = (list: WatchlistItem[]) => {
+  const saveWatchlist = useCallback((list: WatchlistItem[]) => {
     setWatchlist(list);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch (err) {
+      console.error('[Watchlist] Failed to save to localStorage:', err);
+    }
+  }, []);
 
-  const addToWatchlist = (gameId: string) => {
+  const addToWatchlist = useCallback((gameId: string) => {
     if (!watchedGameIds.has(gameId)) {
       saveWatchlist([...watchlist, {
         gameId,
@@ -244,16 +268,24 @@ export function GamesListPage() {
         favorite: false,
       }]);
     }
-  };
+  }, [watchedGameIds, watchlist, saveWatchlist]);
 
-  const removeFromWatchlist = (gameId: string) => {
+  const removeFromWatchlist = useCallback((gameId: string) => {
     saveWatchlist(watchlist.filter(item => item.gameId !== gameId));
-  };
+  }, [watchlist, saveWatchlist]);
+
+  const navigateToGame = useCallback((gameId: string) => {
+    navigate(`/games/${gameId}`);
+  }, [navigate]);
+
+  const navigateToLanding = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
 
   return (
     <Container>
       <Header>
-        <BackButton onClick={() => navigate('/')}>
+        <BackButton onClick={navigateToLanding}>
           ← Back to Landing
         </BackButton>
         <Title>
@@ -277,7 +309,7 @@ export function GamesListPage() {
                       aria-label={getStatusText(game.status)}
                     >
                       <span role="presentation" aria-hidden="true">
-                        {game.status === 'lobby' ? '🟢' : game.status === 'playing' || game.status === 'voting' ? '🔴' : '⬛'}
+                        {getStatusEmoji(game.status)}
                       </span>
                       {' '}{game.status}
                     </StatusBadge>
@@ -300,7 +332,7 @@ export function GamesListPage() {
                 )}
                 <ActionButton
                   variant="primary"
-                  onClick={() => navigate(`/games/${game.gameId}`)}
+                  onClick={() => navigateToGame(game.gameId)}
                 >
                   Enter Spectator Mode →
                 </ActionButton>
@@ -321,7 +353,7 @@ export function GamesListPage() {
           <GamesGrid>
             {watchlist.map(item => {
               const game = gamesMap.get(item.gameId);
-              const status = game?.status ?? 'unknown';
+              const status: GameStatus = game?.status ?? 'unknown';
               return (
                 <GameCard key={item.gameId}>
                   <GameInfoWrapper>
@@ -334,7 +366,7 @@ export function GamesListPage() {
                           aria-label={getStatusText(status)}
                         >
                           <span role="presentation" aria-hidden="true">
-                            {status === 'lobby' ? '🟢' : status === 'playing' || status === 'voting' ? '🔴' : '⬛'}
+                            {getStatusEmoji(status)}
                           </span>
                           {' '}{status}
                         </StatusBadge>
@@ -344,7 +376,7 @@ export function GamesListPage() {
                   <GameActions>
                     <ActionButton
                       variant="primary"
-                      onClick={() => navigate(`/games/${item.gameId}`)}
+                      onClick={() => navigateToGame(item.gameId)}
                     >
                       View
                     </ActionButton>
