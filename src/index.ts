@@ -1,7 +1,7 @@
 import { GameServer } from '@/server/index';
 
 async function main() {
-  console.log('🧬 Among Us AI Server Starting...');
+  console.log('🧬 Double Agent Server Starting...');
 
   // Create and start server
   const server = new GameServer(3000);

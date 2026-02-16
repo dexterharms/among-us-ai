@@ -30,7 +30,7 @@ export interface LogContext {
 
 class Logger {
   private level: LogLevel;
-  private prefix = '[AmongUsAI]';
+  private prefix = '[DoubleAgentAI]';
 
   constructor() {
     // Read from environment or default to INFO

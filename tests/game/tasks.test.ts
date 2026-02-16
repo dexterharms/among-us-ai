@@ -30,7 +30,7 @@ describe('TaskManager', () => {
     // Clear existing task interactables from all rooms, then add test tasks
     // This ensures TaskManager calculates totalTasks correctly
     // Use actual room IDs from ROOMS array: center, electrical-room, logs-room
-    // In Among Us, each crewmate has their own tasks to complete. For testing,
+    // In Double Agent, each loyalist has their own tasks to complete. For testing,
     // we add all 3 tasks to each room so any player in any room can complete
     // their assigned tasks. This simulates the real game where tasks are
     // assigned to specific players, not locations.

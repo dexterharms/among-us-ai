@@ -8,7 +8,7 @@
 
 ## Overview
 
-The Manor is the first map for Among Us AI. A space station with a medieval-estate naming scheme — rooms named after castle/manor areas, but the tasks and flavor remain sci-fi.
+The Manor is the first map for Double Agent. A space station with a medieval-estate naming scheme — rooms named after castle/manor areas, but the tasks and flavor remain sci-fi.
 
 ---
 
@@ -88,7 +88,7 @@ Players can vent between rooms in the same network.
 
 | Sabotage | Fix Location(s) | Description |
 |----------|-----------------|-------------|
-| Lights Out | Electrical ONLY | Imposters can see, crewmates cannot |
+| Lights Out | Electrical ONLY | Moles can see, loyalists cannot |
 | Communications | Communication | Disables certain info |
 | O2/Life Support | Life Support | Timer-based emergency |
 | Lockdown | **No fix point** | 30s expiry, doors unlock via random single-digit code |
@@ -109,7 +109,7 @@ Players can vent between rooms in the same network.
   8. Transfer Fuel (Logic)
 
 - Tasks assigned **randomized but weighted towards evenness**
-- Some tasks may have 0 players, others may have all 6 crewmates doing them
+- Some tasks may have 0 players, others may have all 6 loyalists doing them
 - Flavor texts added after playtesting settles locations
 
 ---

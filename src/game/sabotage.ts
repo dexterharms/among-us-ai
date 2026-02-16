@@ -275,7 +275,7 @@ export class SabotageSystem {
       return { success: true, reason: 'Fix contribution recorded' };
     }
 
-    // Other sabotage types are fixed by single crewmate
+    // Other sabotage types are fixed by single loyalist
     this.endSabotage(sabotageId);
     return { success: true, reason: 'Sabotage fixed!' };
   }
