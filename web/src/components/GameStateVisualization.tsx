@@ -1,5 +1,5 @@
 import type { ActionWithState } from '@/hooks/useEventStream';
-import { PlayerStatus, PlayerRole } from '@/types/game';
+import { PlayerStatus, PlayerRole, type Player, type DeadBody, type GameState } from '@/types/game';
 
 interface GameStateVisualizationProps {
   actions: ActionWithState[];
@@ -13,7 +13,7 @@ interface GameStateVisualizationProps {
 export function GameStateVisualization({ actions }: GameStateVisualizationProps) {
   // Get the most recent action with game state
   const latestAction = actions[actions.length - 1];
-  const gameState = latestAction?.gameState;
+  const gameState = latestAction?.gameState as GameState | undefined;
 
   if (!gameState) {
     return (
@@ -23,10 +23,12 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
     );
   }
 
-  // Handle both Map and Array for players
-  const players = Array.from(
-    gameState.players instanceof Map ? gameState.players.values() : gameState.players
-  );
+  // Safely handle both Map and Array for players with validation
+  const players: Player[] = gameState.players
+    ? Array.from(
+        gameState.players instanceof Map ? gameState.players.values() : gameState.players
+      )
+    : [];
 
   const getStatusColor = (status: PlayerStatus) => {
     switch (status) {
@@ -73,7 +75,7 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
       <div className="game-info">
         <div className="info-item">
           <span className="info-label">Timer:</span>
-          <span className="info-value">{formatTimer(gameState.roundTimer || 0)}</span>
+          <span className="info-value">{formatTimer(gameState.roundTimer ?? 0)}</span>
         </div>
         <div className="info-item">
           <span className="info-label">Players:</span>
@@ -85,38 +87,43 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
         </div>
         <div className="info-item">
           <span className="info-label">Dead Bodies:</span>
-          <span className="info-value">{gameState.deadBodies?.length || 0}</span>
+          <span className="info-value">{gameState.deadBodies?.length ?? 0}</span>
         </div>
       </div>
 
       <div className="players-list">
         <h4>Players</h4>
         <div className="players-grid">
-          {players.map((player: any) => (
-            <div
-              key={player.id}
-              className="player-card"
-              style={{
-                borderColor: getStatusColor(player.status),
-                backgroundColor: `${getRoleColor(player.role)}20`,
-              }}
-            >
-              <div className="player-name">{player.name}</div>
-              <div className="player-role" style={{ color: getRoleColor(player.role) }}>
-                {player.role}
-              </div>
-              <div className="player-status" style={{ color: getStatusColor(player.status) }}>
-                {player.status}
-              </div>
-              <div className="player-location">
-                📍 {player.location?.roomId || 'Unknown'}
-              </div>
-              {player.taskProgress !== undefined && player.role === PlayerRole.LOYALIST && (
-                <div className="player-task-progress">
-                  Tasks: {player.taskProgress}%
+          {players.map((player) => (
+            player?.id ? (
+              <div
+                key={player.id}
+                className="player-card"
+                style={{
+                  borderColor: getStatusColor(player.status),
+                  backgroundColor: `${getRoleColor(player.role)}20`,
+                }}
+              >
+                <div className="player-name">{player.name}</div>
+                <div className="player-role" style={{ color: getRoleColor(player.role) }}>
+                  {player.role}
                 </div>
-              )}
-            </div>
+                <div className="player-status" style={{ color: getStatusColor(player.status) }}>
+                  {player.status}
+                </div>
+                <div
+                  className="player-location"
+                  aria-label={`Location: ${player.location?.roomId ?? 'Unknown'}`}
+                >
+                  <span role="presentation" aria-hidden="true">📍</span> {player.location?.roomId ?? 'Unknown'}
+                </div>
+                {player.taskProgress !== undefined && player.role === PlayerRole.LOYALIST && (
+                  <div className="player-task-progress">
+                    Tasks: {player.taskProgress}%
+                  </div>
+                )}
+              </div>
+            ) : null
           ))}
         </div>
       </div>
@@ -125,16 +132,21 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
         <div className="bodies-list">
           <h4>Dead Bodies</h4>
           <div className="bodies-grid">
-            {gameState.deadBodies.map((body: any, index: number) => (
-              <div key={`${body.playerId}-${index}`} className="body-card">
-                <div className="body-player">Player {body.playerId}</div>
-                <div className="body-location">
-                  📍 {body.location?.roomId || 'Unknown'}
+            {gameState.deadBodies.map((body: DeadBody, index: number) => (
+              body?.playerId ? (
+                <div key={`${body.playerId}-${index}`} className="body-card">
+                  <div className="body-player">Player {body.playerId}</div>
+                  <div
+                    className="body-location"
+                    aria-label={`Location: ${body.location?.roomId ?? 'Unknown'}`}
+                  >
+                    <span role="presentation" aria-hidden="true">📍</span> {body.location?.roomId ?? 'Unknown'}
+                  </div>
+                  {body.reported && (
+                    <div className="body-reported">✓ Reported</div>
+                  )}
                 </div>
-                {body.reported && (
-                  <div className="body-reported">✓ Reported</div>
-                )}
-              </div>
+              ) : null
             ))}
           </div>
         </div>

@@ -1,20 +1,35 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { GameState } from '@/types/game';
 
 export interface GameEvent {
   timestamp: number;
   type: string;
-  payload: any;
+  payload: unknown;
 }
 
 export interface ActionWithState {
   event: GameEvent;
-  gameState: any;
+  gameState: GameState | null;
 }
 
 interface SSEOptions {
   url: string;
   reconnectInterval?: number;
   maxRetries?: number;
+}
+
+/**
+ * Type guard to validate that parsed data has the expected structure
+ */
+function isValidActionWithState(data: unknown): data is ActionWithState {
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    obj.event !== null &&
+    typeof obj.event === 'object' &&
+    typeof (obj.event as Record<string, unknown>).timestamp === 'number' &&
+    typeof (obj.event as Record<string, unknown>).type === 'string'
+  );
 }
 
 /**
@@ -61,8 +76,16 @@ export function useEventStream(options: SSEOptions) {
 
     eventSource.onmessage = (event) => {
       try {
-        const action: ActionWithState = JSON.parse(event.data);
-        setActions((prev) => [...prev, action]);
+        const parsed: unknown = JSON.parse(event.data);
+
+        // Validate the parsed data structure
+        if (isValidActionWithState(parsed)) {
+          setActions((prev) => [...prev, parsed]);
+        } else {
+          if (import.meta.env.DEV) {
+            console.warn('[SSE] Received malformed message, skipping:', parsed);
+          }
+        }
       } catch (err) {
         if (import.meta.env.DEV) {
           console.error('[SSE] Failed to parse message:', err);

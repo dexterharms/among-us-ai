@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 
@@ -12,7 +12,7 @@ interface WatchlistItem {
   favorite: boolean;
 }
 
-interface GameInfo {
+interface GameData {
   gameId: string;
   status: 'lobby' | 'playing' | 'voting' | 'gameover';
   playerCount: number;
@@ -96,7 +96,7 @@ const GameCard = styled.div`
   }
 `;
 
-const GameInfo = styled.div`
+const GameInfoWrapper = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -185,15 +185,38 @@ const EmptyState = styled.div`
 `;
 
 // Mock games data - in production this would come from an API
-const mockGames: GameInfo[] = [
+const mockGames: GameData[] = [
   { gameId: 'game-a1b2c3d4', status: 'lobby', playerCount: 3, maxPlayers: 10, mapName: 'The Manor' },
   { gameId: 'game-e5f6g7h8', status: 'playing', playerCount: 8, maxPlayers: 10, mapName: 'The Manor', roundNumber: 2 },
   { gameId: 'dead-man-ff22', status: 'gameover', playerCount: 0, maxPlayers: 10, mapName: 'The Manor' },
 ];
 
+// Status text mapping for accessibility
+const getStatusText = (status: string): string => {
+  switch (status) {
+    case 'lobby': return 'In Lobby';
+    case 'playing': return 'Currently Playing';
+    case 'voting': return 'Voting Phase';
+    case 'gameover': return 'Game Over';
+    default: return 'Unknown Status';
+  }
+};
+
 export function GamesListPage() {
   const navigate = useNavigate();
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+
+  // Memoize watchlist IDs for O(1) lookup
+  const watchedGameIds = useMemo(
+    () => new Set(watchlist.map(item => item.gameId)),
+    [watchlist]
+  );
+
+  // Memoize games lookup map for watchlist section
+  const gamesMap = useMemo(
+    () => new Map(mockGames.map(g => [g.gameId, g])),
+    []
+  );
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -212,8 +235,7 @@ export function GamesListPage() {
   };
 
   const addToWatchlist = (gameId: string) => {
-    const exists = watchlist.find(item => item.gameId === gameId);
-    if (!exists) {
+    if (!watchedGameIds.has(gameId)) {
       saveWatchlist([...watchlist, {
         gameId,
         addedAt: new Date().toISOString(),
@@ -228,27 +250,15 @@ export function GamesListPage() {
     saveWatchlist(watchlist.filter(item => item.gameId !== gameId));
   };
 
-  const isInWatchlist = (gameId: string) => {
-    return watchlist.some(item => item.gameId === gameId);
-  };
-
-  const getStatusIndicator = (status: string) => {
-    switch (status) {
-      case 'lobby': return '🟢';
-      case 'playing':
-      case 'voting': return '🔴';
-      case 'gameover': return '⬛';
-      default: return '⚪';
-    }
-  };
-
   return (
     <Container>
       <Header>
         <BackButton onClick={() => navigate('/')}>
           ← Back to Landing
         </BackButton>
-        <Title>📡 WATCH ROOM</Title>
+        <Title>
+          <span role="presentation" aria-hidden="true">📡</span> WATCH ROOM
+        </Title>
         <div style={{ width: '120px' }} />
       </Header>
 
@@ -257,13 +267,19 @@ export function GamesListPage() {
         <GamesGrid>
           {mockGames.map(game => (
             <GameCard key={game.gameId}>
-              <GameInfo>
-                <GameIcon>📡</GameIcon>
+              <GameInfoWrapper>
+                <GameIcon role="presentation" aria-hidden="true">📡</GameIcon>
                 <GameDetails>
                   <GameId>{game.gameId}</GameId>
                   <GameMeta>
-                    <StatusBadge status={game.status}>
-                      {getStatusIndicator(game.status)} {game.status}
+                    <StatusBadge
+                      status={game.status}
+                      aria-label={getStatusText(game.status)}
+                    >
+                      <span role="presentation" aria-hidden="true">
+                        {game.status === 'lobby' ? '🟢' : game.status === 'playing' || game.status === 'voting' ? '🔴' : '⬛'}
+                      </span>
+                      {' '}{game.status}
                     </StatusBadge>
                     <PlayerCount>{game.playerCount}/{game.maxPlayers}</PlayerCount>
                     {game.roundNumber && (
@@ -271,9 +287,9 @@ export function GamesListPage() {
                     )}
                   </GameMeta>
                 </GameDetails>
-              </GameInfo>
+              </GameInfoWrapper>
               <GameActions>
-                {isInWatchlist(game.gameId) ? (
+                {watchedGameIds.has(game.gameId) ? (
                   <ActionButton onClick={() => removeFromWatchlist(game.gameId)}>
                     Added ✓
                   </ActionButton>
@@ -304,21 +320,27 @@ export function GamesListPage() {
         ) : (
           <GamesGrid>
             {watchlist.map(item => {
-              const game = mockGames.find(g => g.gameId === item.gameId);
-              const status = game?.status || 'unknown';
+              const game = gamesMap.get(item.gameId);
+              const status = game?.status ?? 'unknown';
               return (
                 <GameCard key={item.gameId}>
-                  <GameInfo>
-                    <GameIcon>📌</GameIcon>
+                  <GameInfoWrapper>
+                    <GameIcon role="presentation" aria-hidden="true">📌</GameIcon>
                     <GameDetails>
                       <GameId>{item.gameId}</GameId>
                       <GameMeta>
-                        <StatusBadge status={status}>
-                          {getStatusIndicator(status)} {status}
+                        <StatusBadge
+                          status={status}
+                          aria-label={getStatusText(status)}
+                        >
+                          <span role="presentation" aria-hidden="true">
+                            {status === 'lobby' ? '🟢' : status === 'playing' || status === 'voting' ? '🔴' : '⬛'}
+                          </span>
+                          {' '}{status}
                         </StatusBadge>
                       </GameMeta>
                     </GameDetails>
-                  </GameInfo>
+                  </GameInfoWrapper>
                   <GameActions>
                     <ActionButton
                       variant="primary"

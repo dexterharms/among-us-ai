@@ -1,8 +1,11 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 import { LogViewer } from '@/components/LogViewer';
 import { GameStateVisualization } from '@/components/GameStateVisualization';
 import { useEventStream } from '@/hooks/useEventStream';
+
+// Configurable API URL via environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const Container = styled.div`
   display: flex;
@@ -65,7 +68,6 @@ const ConnectionIndicator = styled.span<{ connected: boolean }>`
     height: 8px;
     border-radius: 50%;
     background: ${props => props.connected ? '#4ade80' : '#f87171'};
-    animation: ${props => props.connected ? 'none' : 'pulse 1.5s infinite'};
   }
 `;
 
@@ -133,8 +135,13 @@ export function SpectatorPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
 
+  // Validate gameId - redirect if missing
+  if (!gameId) {
+    return <Navigate to="/games" replace />;
+  }
+
   const { actions, connected, error, clearActions } = useEventStream({
-    url: 'http://localhost:3000/api/stream/actions',
+    url: `${API_BASE_URL}/api/stream/actions`,
   });
 
   return (
@@ -144,9 +151,16 @@ export function SpectatorPage() {
           <BackButton onClick={() => navigate('/games')}>
             ← Games
           </BackButton>
-          <GameTitle>📡 {gameId}</GameTitle>
+          <GameTitle aria-label={`Game: ${gameId}`}>
+            <span role="presentation">📡</span> {gameId}
+          </GameTitle>
         </StatusLeft>
-        <ConnectionIndicator connected={connected}>
+        <ConnectionIndicator
+          connected={connected}
+          role="status"
+          aria-live="polite"
+          aria-label={connected ? 'Connected to game stream' : 'Disconnected from game stream'}
+        >
           {connected ? 'LIVE' : error || 'CONNECTING...'}
         </ConnectionIndicator>
       </StatusBar>
