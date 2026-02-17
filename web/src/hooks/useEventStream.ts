@@ -1,20 +1,38 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { GameState } from '@/types/game';
 
 export interface GameEvent {
   timestamp: number;
   type: string;
-  payload: any;
+  payload: unknown;
 }
 
 export interface ActionWithState {
   event: GameEvent;
-  gameState: any;
+  gameState: GameState | null;
 }
 
 interface SSEOptions {
   url: string;
   reconnectInterval?: number;
   maxRetries?: number;
+  maxActions?: number;
+}
+
+const DEFAULT_MAX_ACTIONS = 500;
+
+/**
+ * Type guard to validate that parsed data has the expected structure
+ */
+function isValidActionWithState(data: unknown): data is ActionWithState {
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    obj.event !== null &&
+    typeof obj.event === 'object' &&
+    typeof (obj.event as Record<string, unknown>).timestamp === 'number' &&
+    typeof (obj.event as Record<string, unknown>).type === 'string'
+  );
 }
 
 /**
@@ -23,7 +41,12 @@ interface SSEOptions {
  * Connects to SSE endpoint and streams game events in real-time.
  */
 export function useEventStream(options: SSEOptions) {
-  const { url, reconnectInterval = 5000, maxRetries = 10 } = options;
+  const {
+    url,
+    reconnectInterval = 5000,
+    maxRetries = 10,
+    maxActions = DEFAULT_MAX_ACTIONS,
+  } = options;
 
   const [actions, setActions] = useState<ActionWithState[]>([]);
   const [connected, setConnected] = useState(false);
@@ -31,6 +54,8 @@ export function useEventStream(options: SSEOptions) {
   const retryCountRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track mounted state to prevent setState after unmount
+  const mountedRef = useRef(true);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current) {
@@ -51,6 +76,7 @@ export function useEventStream(options: SSEOptions) {
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
+      if (!mountedRef.current) return;
       if (import.meta.env.DEV) {
         console.log('[SSE] Connected');
       }
@@ -60,17 +86,33 @@ export function useEventStream(options: SSEOptions) {
     };
 
     eventSource.onmessage = (event) => {
+      if (!mountedRef.current) return;
       try {
-        const action: ActionWithState = JSON.parse(event.data);
-        setActions((prev) => [...prev, action]);
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          console.error('[SSE] Failed to parse message:', err);
+        const parsed: unknown = JSON.parse(event.data);
+
+        // Validate the parsed data structure
+        if (isValidActionWithState(parsed)) {
+          // Limit array size to prevent memory leak - keep most recent maxActions
+          setActions((prev) => {
+            const newActions = [...prev, parsed];
+            if (newActions.length > maxActions) {
+              return newActions.slice(-maxActions);
+            }
+            return newActions;
+          });
+        } else {
+          if (import.meta.env.DEV) {
+            console.warn('[SSE] Received malformed message, skipping:', parsed);
+          }
         }
+      } catch (err) {
+        // Always log parse errors, include raw data for debugging
+        console.error('[SSE] Failed to parse message:', err, 'Raw data:', event.data);
       }
     };
 
     eventSource.onerror = () => {
+      if (!mountedRef.current) return;
       if (import.meta.env.DEV) {
         console.error('[SSE] Connection error');
       }
@@ -88,9 +130,12 @@ export function useEventStream(options: SSEOptions) {
         setError('Connection failed. Max retries reached.');
       }
     };
-  }, [url, reconnectInterval, maxRetries]);
+  }, [url, reconnectInterval, maxRetries, maxActions]);
 
   const disconnect = useCallback(() => {
+    // Mark as unmounted to prevent further state updates
+    mountedRef.current = false;
+
     // Clear any pending reconnect timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -112,6 +157,8 @@ export function useEventStream(options: SSEOptions) {
   }, []);
 
   useEffect(() => {
+    // Reset mounted state on mount
+    mountedRef.current = true;
     connect();
 
     return () => {

@@ -1,8 +1,69 @@
+import { useMemo } from 'react';
 import type { ActionWithState } from '@/hooks/useEventStream';
-import { PlayerStatus, PlayerRole } from '@/types/game';
+import { PlayerStatus, PlayerRole, type Player, type DeadBody, type GameState } from '@/types/game';
 
 interface GameStateVisualizationProps {
   actions: ActionWithState[];
+}
+
+// Pure utility functions moved outside component to avoid recreation on every render
+function getStatusColor(status: PlayerStatus): string {
+  switch (status) {
+    case PlayerStatus.ALIVE:
+      return '#4caf50'; // Green
+    case PlayerStatus.DEAD:
+      return '#f44336'; // Red
+    case PlayerStatus.EJECTED:
+      return '#ff9800'; // Orange
+    default:
+      return '#9e9e9e'; // Grey
+  }
+}
+
+function getRoleColor(role: PlayerRole): string {
+  switch (role) {
+    case PlayerRole.MOLE:
+      return '#e91e63'; // Pink
+    case PlayerRole.LOYALIST:
+      return '#2196f3'; // Blue
+    default:
+      return '#9e9e9e'; // Grey
+  }
+}
+
+function formatTimer(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Icons for status (not color-only) - improves accessibility for colorblind users
+function getStatusIcon(status: PlayerStatus): string {
+  switch (status) {
+    case PlayerStatus.ALIVE: return '✓';
+    case PlayerStatus.DEAD: return '✗';
+    case PlayerStatus.EJECTED: return '→';
+    default: return '?';
+  }
+}
+
+// Icons for role (not color-only) - improves accessibility for colorblind users
+function getRoleIcon(role: PlayerRole): string {
+  switch (role) {
+    case PlayerRole.MOLE: return '🎭';
+    case PlayerRole.LOYALIST: return '🛡';
+    default: return '?';
+  }
+}
+
+/**
+ * Helper to convert players to array (handles both Map and Array formats)
+ */
+function playersToArray(players: GameState['players'] | undefined): Player[] {
+  if (!players) return [];
+  return Array.from(
+    players instanceof Map ? players.values() : players
+  );
 }
 
 /**
@@ -13,7 +74,14 @@ interface GameStateVisualizationProps {
 export function GameStateVisualization({ actions }: GameStateVisualizationProps) {
   // Get the most recent action with game state
   const latestAction = actions[actions.length - 1];
+  // Handle null properly (ActionWithState.gameState is GameState | null)
   const gameState = latestAction?.gameState;
+
+  // Memoize players array conversion to avoid reallocation on every render
+  const players = useMemo(
+    () => playersToArray(gameState?.players),
+    [gameState?.players]
+  );
 
   if (!gameState) {
     return (
@@ -22,41 +90,6 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
       </div>
     );
   }
-
-  // Handle both Map and Array for players
-  const players = Array.from(
-    gameState.players instanceof Map ? gameState.players.values() : gameState.players
-  );
-
-  const getStatusColor = (status: PlayerStatus) => {
-    switch (status) {
-      case PlayerStatus.ALIVE:
-        return '#4caf50'; // Green
-      case PlayerStatus.DEAD:
-        return '#f44336'; // Red
-      case PlayerStatus.EJECTED:
-        return '#ff9800'; // Orange
-      default:
-        return '#9e9e9e'; // Grey
-    }
-  };
-
-  const getRoleColor = (role: PlayerRole) => {
-    switch (role) {
-      case PlayerRole.MOLE:
-        return '#e91e63'; // Pink
-      case PlayerRole.LOYALIST:
-        return '#2196f3'; // Blue
-      default:
-        return '#9e9e9e'; // Grey
-    }
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className="game-state">
@@ -73,7 +106,7 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
       <div className="game-info">
         <div className="info-item">
           <span className="info-label">Timer:</span>
-          <span className="info-value">{formatTimer(gameState.roundTimer || 0)}</span>
+          <span className="info-value">{formatTimer(gameState.roundTimer ?? 0)}</span>
         </div>
         <div className="info-item">
           <span className="info-label">Players:</span>
@@ -85,38 +118,43 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
         </div>
         <div className="info-item">
           <span className="info-label">Dead Bodies:</span>
-          <span className="info-value">{gameState.deadBodies?.length || 0}</span>
+          <span className="info-value">{gameState.deadBodies?.length ?? 0}</span>
         </div>
       </div>
 
       <div className="players-list">
         <h4>Players</h4>
         <div className="players-grid">
-          {players.map((player: any) => (
-            <div
-              key={player.id}
-              className="player-card"
-              style={{
-                borderColor: getStatusColor(player.status),
-                backgroundColor: `${getRoleColor(player.role)}20`,
-              }}
-            >
-              <div className="player-name">{player.name}</div>
-              <div className="player-role" style={{ color: getRoleColor(player.role) }}>
-                {player.role}
-              </div>
-              <div className="player-status" style={{ color: getStatusColor(player.status) }}>
-                {player.status}
-              </div>
-              <div className="player-location">
-                📍 {player.location?.roomId || 'Unknown'}
-              </div>
-              {player.taskProgress !== undefined && player.role === PlayerRole.LOYALIST && (
-                <div className="player-task-progress">
-                  Tasks: {player.taskProgress}%
+          {players.map((player) => (
+            player?.id ? (
+              <div
+                key={player.id}
+                className="player-card"
+                style={{
+                  borderColor: getStatusColor(player.status),
+                  backgroundColor: `${getRoleColor(player.role)}20`,
+                }}
+              >
+                <div className="player-name">{player.name}</div>
+                <div className="player-role" style={{ color: getRoleColor(player.role) }}>
+                  <span aria-hidden="true">{getRoleIcon(player.role)}</span> {player.role}
                 </div>
-              )}
-            </div>
+                <div className="player-status" style={{ color: getStatusColor(player.status) }}>
+                  <span aria-hidden="true">{getStatusIcon(player.status)}</span> {player.status}
+                </div>
+                <div
+                  className="player-location"
+                  aria-label={`Location: ${player.location?.roomId ?? 'Unknown'}`}
+                >
+                  <span role="presentation" aria-hidden="true">📍</span> {player.location?.roomId ?? 'Unknown'}
+                </div>
+                {player.taskProgress !== undefined && player.role === PlayerRole.LOYALIST && (
+                  <div className="player-task-progress">
+                    Tasks: {player.taskProgress}%
+                  </div>
+                )}
+              </div>
+            ) : null
           ))}
         </div>
       </div>
@@ -125,16 +163,21 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
         <div className="bodies-list">
           <h4>Dead Bodies</h4>
           <div className="bodies-grid">
-            {gameState.deadBodies.map((body: any, index: number) => (
-              <div key={`${body.playerId}-${index}`} className="body-card">
-                <div className="body-player">Player {body.playerId}</div>
-                <div className="body-location">
-                  📍 {body.location?.roomId || 'Unknown'}
+            {gameState.deadBodies.map((body: DeadBody) => (
+              body?.playerId ? (
+                <div key={body.playerId} className="body-card">
+                  <div className="body-player">Player {body.playerId}</div>
+                  <div
+                    className="body-location"
+                    aria-label={`Location: ${body.location?.roomId ?? 'Unknown'}`}
+                  >
+                    <span role="presentation" aria-hidden="true">📍</span> {body.location?.roomId ?? 'Unknown'}
+                  </div>
+                  {body.reported && (
+                    <div className="body-reported">✓ Reported</div>
+                  )}
                 </div>
-                {body.reported && (
-                  <div className="body-reported">✓ Reported</div>
-                )}
-              </div>
+              ) : null
             ))}
           </div>
         </div>
