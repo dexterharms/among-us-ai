@@ -37,6 +37,25 @@ function formatTimer(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+// Icons for status (not color-only) - improves accessibility for colorblind users
+function getStatusIcon(status: PlayerStatus): string {
+  switch (status) {
+    case PlayerStatus.ALIVE: return '✓';
+    case PlayerStatus.DEAD: return '✗';
+    case PlayerStatus.EJECTED: return '→';
+    default: return '?';
+  }
+}
+
+// Icons for role (not color-only) - improves accessibility for colorblind users
+function getRoleIcon(role: PlayerRole): string {
+  switch (role) {
+    case PlayerRole.MOLE: return '🎭';
+    case PlayerRole.LOYALIST: return '🛡';
+    default: return '?';
+  }
+}
+
 /**
  * Helper to convert players to array (handles both Map and Array formats)
  */
@@ -118,10 +137,10 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
               >
                 <div className="player-name">{player.name}</div>
                 <div className="player-role" style={{ color: getRoleColor(player.role) }}>
-                  {player.role}
+                  <span aria-hidden="true">{getRoleIcon(player.role)}</span> {player.role}
                 </div>
                 <div className="player-status" style={{ color: getStatusColor(player.status) }}>
-                  {player.status}
+                  <span aria-hidden="true">{getStatusIcon(player.status)}</span> {player.status}
                 </div>
                 <div
                   className="player-location"
@@ -144,9 +163,9 @@ export function GameStateVisualization({ actions }: GameStateVisualizationProps)
         <div className="bodies-list">
           <h4>Dead Bodies</h4>
           <div className="bodies-grid">
-            {gameState.deadBodies.map((body: DeadBody, index: number) => (
+            {gameState.deadBodies.map((body: DeadBody) => (
               body?.playerId ? (
-                <div key={`${body.playerId}-${index}`} className="body-card">
+                <div key={body.playerId} className="body-card">
                   <div className="body-player">Player {body.playerId}</div>
                   <div
                     className="body-location"

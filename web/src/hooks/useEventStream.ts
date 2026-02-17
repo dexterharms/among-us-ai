@@ -54,6 +54,8 @@ export function useEventStream(options: SSEOptions) {
   const retryCountRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track mounted state to prevent setState after unmount
+  const mountedRef = useRef(true);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current) {
@@ -74,6 +76,7 @@ export function useEventStream(options: SSEOptions) {
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
+      if (!mountedRef.current) return;
       if (import.meta.env.DEV) {
         console.log('[SSE] Connected');
       }
@@ -83,6 +86,7 @@ export function useEventStream(options: SSEOptions) {
     };
 
     eventSource.onmessage = (event) => {
+      if (!mountedRef.current) return;
       try {
         const parsed: unknown = JSON.parse(event.data);
 
@@ -108,6 +112,7 @@ export function useEventStream(options: SSEOptions) {
     };
 
     eventSource.onerror = () => {
+      if (!mountedRef.current) return;
       if (import.meta.env.DEV) {
         console.error('[SSE] Connection error');
       }
@@ -128,6 +133,9 @@ export function useEventStream(options: SSEOptions) {
   }, [url, reconnectInterval, maxRetries, maxActions]);
 
   const disconnect = useCallback(() => {
+    // Mark as unmounted to prevent further state updates
+    mountedRef.current = false;
+
     // Clear any pending reconnect timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -149,6 +157,8 @@ export function useEventStream(options: SSEOptions) {
   }, []);
 
   useEffect(() => {
+    // Reset mounted state on mount
+    mountedRef.current = true;
     connect();
 
     return () => {

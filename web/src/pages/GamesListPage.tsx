@@ -249,30 +249,38 @@ export function GamesListPage() {
     }
   }, []);
 
-  const saveWatchlist = useCallback((list: WatchlistItem[]) => {
-    setWatchlist(list);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch (err) {
-      console.error('[Watchlist] Failed to save to localStorage:', err);
-    }
+  // Use function updater pattern to avoid race conditions from stale closures
+  const saveWatchlist = useCallback((updater: (prev: WatchlistItem[]) => WatchlistItem[]) => {
+    setWatchlist((prev) => {
+      const newList = updater(prev);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+      } catch (err) {
+        console.error('[Watchlist] Failed to save to localStorage:', err);
+      }
+      return newList;
+    });
   }, []);
 
   const addToWatchlist = useCallback((gameId: string) => {
-    if (!watchedGameIds.has(gameId)) {
-      saveWatchlist([...watchlist, {
+    saveWatchlist((prev) => {
+      // Check if already in list (using prev, not stale watchlist)
+      if (prev.some(item => item.gameId === gameId)) {
+        return prev;
+      }
+      return [...prev, {
         gameId,
         addedAt: new Date().toISOString(),
         status: 'active',
         lastSeenAt: new Date().toISOString(),
         favorite: false,
-      }]);
-    }
-  }, [watchedGameIds, watchlist, saveWatchlist]);
+      }];
+    });
+  }, [saveWatchlist]);
 
   const removeFromWatchlist = useCallback((gameId: string) => {
-    saveWatchlist(watchlist.filter(item => item.gameId !== gameId));
-  }, [watchlist, saveWatchlist]);
+    saveWatchlist((prev) => prev.filter(item => item.gameId !== gameId));
+  }, [saveWatchlist]);
 
   const navigateToGame = useCallback((gameId: string) => {
     navigate(`/games/${gameId}`);
